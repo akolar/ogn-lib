@@ -1,0 +1,7 @@
+__title__ = 'ogn-consumer'
+__description__ = 'Beacon processor for the OGN data stream.'
+__version__ = '0.1.0'
+__author__ = 'Anze Kolar'
+__author_email__ = 'me@akolar.com'
+__license__ = 'MIT'
+__copyright__ = 'Copyright 2017 Anze Kolar'
