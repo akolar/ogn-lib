@@ -1,22 +1,21 @@
 sudo: false
 language: python
 
-python:
-  - "3.6"
-  - "3.5"
-  - "3.4"
-  - "3.3"
-  - "pypy3"
-
 install:
   - pip install tox 
 
 script:
   - tox
 
-env:
-  - TOXENV='py36'
-  - TOXENV='py35'
-  - TOXENV='py34'
-  - TOXENV='py33'
-  - TOXENV='pypy3'
+matrix:
+  include:
+    - python: "3.6"
+      env: TOXENV='py36'
+    - python: "3.5"
+      env: TOXENV='py35'
+    - python: "3.4"
+      env: TOXENV='py34'
+    - python: "3.3"
+      env: TOXENV='py33'
+    - python: "pypy3"
+      env: TOXENV='pypy3'
