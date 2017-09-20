@@ -61,6 +61,7 @@ class OgnClient:
         :raise ogn_lib.exceptions.LoginError: if an authentication error has
                                               occured
         """
+
         logger.info('Connecting to %s:%d as %s:%s. Filter: %s',
                     self.server, self.port, self.username, self.passcode,
                     self.filter_ if self.filter_ else 'not set')
@@ -80,8 +81,10 @@ class OgnClient:
 
         try:
             self._authenticated = self._validate_login(login_status)
-        except ogn_lib.exceptions.LoginError as e:
+        except (ogn_lib.exceptions.LoginError,
+                ogn_lib.exceptions.ParseError) as e:
             logger.exception(e)
+            logger.fatal('Failed to authenticate')
             self._sock_file.close()
             self._socket.close()
             logger.info('Socket closed')
@@ -120,6 +123,9 @@ class OgnClient:
     def _gen_auth_message(self):
         """
         Generates an APRS authentication message.
+
+        :return: authentication message
+        :rtype: str
         """
 
         base = 'user {} pass {} vers {} {}'.format(self.username,
@@ -137,13 +143,23 @@ class OgnClient:
         Verifies that the login to the APRS server was successful.
 
         :param str message: authentication response from the server
+        :return: True if user is authenticated to send messages
+        :rtype: bool
         :raises ogn_lib.exceptions.LoginError: if the login was unsuccessful
         """
 
         # Sample response: # logresp user unverified, server GLIDERN3
-        user_info, serv_info = message.split(', ')
-        username, status = user_info[10:].split(' ')
-        server = serv_info[7:]
+        if not message.startswith('# logresp'):
+            raise ogn_lib.exceptions.LoginError(
+                'Not a login message: ' + message)
+
+        try:
+            user_info, serv_info = message.split(', ')
+            username, status = user_info[10:].split(' ')
+            server = serv_info[7:]
+        except (IndexError, ValueError):
+            raise ogn_lib.exceptions.ParseError(
+                'Unable to parse login message: ' + message)
 
         authenticated = False
         if status == 'verified':
