@@ -1,3 +1,5 @@
+from ogn_lib.client import OgnClient  # noqa: F401
+
 __title__ = 'ogn-lib'
 __description__ = 'Beacon processor for the OGN data stream.'
 __version__ = '0.1.0'
