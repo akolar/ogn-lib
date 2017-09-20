@@ -52,8 +52,8 @@ class TestClient:
             with pytest.raises(exceptions.ParseError):
                 cl.connect()
 
-        cl._sock_file.close.assert_called_once()
-        cl._socket.close.assert_called_once()
+        cl._sock_file.close.call_count == 1
+        cl._socket.close.call_count == 1
 
     def test_send(self, mocker):
         cl = client.OgnClient('username')
