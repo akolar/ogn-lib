@@ -2,7 +2,7 @@ sudo: false
 language: python
 
 install:
-  - pip install tox 
+  - pip install tox
 
 script:
   - tox
@@ -21,3 +21,9 @@ matrix:
       env: TOXENV='pypy3'
     - python: "3.6"
       env: TOXENV='flake8'
+
+after_success:
+  - |
+    if [[ $TRAVIS_PYTHON_VERSION == $NEWEST_PYTHON ]]; then
+      pip install --user codecov && codecov
+    fi
