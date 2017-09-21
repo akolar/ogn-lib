@@ -80,8 +80,8 @@ class TestClient:
             cl.disconnect()
 
         assert cl._kill
-        sock.close.assert_called()
-        cl._sock_file.close.assert_called()
+        assert sock.close.call_count > 0
+        assert cl._sock_file.close.call_count > 0
 
     def test_receive_exit(self, mocker):
         sock = self._get_mocked_socket(mocker, True)
@@ -101,7 +101,7 @@ class TestClient:
             cl.connect = mocker.MagicMock(side_effect=lambda: cl.disconnect())
             cl.receive(lambda x: None)
 
-        cl.connect.assert_called()
+        assert cl.connect.call_count > 0
 
     def test_receive_loop_exit(self, mocker):
         sock = self._get_mocked_socket(mocker, True)
@@ -140,7 +140,7 @@ class TestClient:
             cb = mocker.MagicMock(side_effect=lambda x: cl.disconnect())
             cl._receive_loop(cb, None)
 
-            cl._keepalive.assert_called()
+        assert cl._keepalive.call_count > 0
 
     def test_send(self, mocker):
         cl = client.OgnClient('username')
@@ -175,7 +175,7 @@ class TestClient:
     def test_keepalive_send(self, mocker):
         cl = self._setup_keepalive_client(mocker, 0)
         cl._keepalive()
-        cl.send.assert_called()
+        assert cl.send.call_count > 0
 
     def test_gen_auth_msg(self):
         cl = client.OgnClient('username')
