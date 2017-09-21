@@ -8,6 +8,7 @@ connection to OGN's APRS servers.
 
 import logging
 import socket
+import time
 
 import ogn_lib
 
@@ -26,6 +27,7 @@ class OgnClient:
     APRS_SERVER = 'aprs.glidernet.org'
     APRS_PORT_FULL = 10152
     APRS_PORT_FILTER = 14580
+    SOCKET_KEEPALIVE = 240
 
     def __init__(self, username, passcode='-1', server=None, port=None,
                  filter_=None):
@@ -52,6 +54,8 @@ class OgnClient:
                              else self.APRS_PORT_FULL)
         self.filter_ = filter_
         self._authenticated = False
+        self._kill = False
+        self._last_send = -1
 
     def connect(self):
         """
@@ -90,7 +94,15 @@ class OgnClient:
             logger.info('Socket closed')
             raise
 
-    def receive(self, callback, reconnect=True, raw=False):
+        self._kill = False
+
+    def disconnect(self):
+        logger.info('Disconnecting from the server')
+        self._kill = True
+        self._sock_file.close()
+        self._socket.close()
+
+    def receive(self, callback, reconnect=True, parser=None):
         """
         Receives the messages received from the APRS stream and passes them to
         the callback function.
@@ -100,13 +112,56 @@ class OgnClient:
         :type callback: callable
         :param bool reconnect: True if the client should automatically restart
                                after the connection drops
-        :param bool raw: True if callback should be passed raw APRS messages
-                         instead of parsed objects
+        :param parser: function that parses the APRS messages or None if
+                       callback should receive raw messages
+        :type parser: callable or None
+        """
+
+        # The client might be ran for extended periods of time. Although using
+        # a recursive call to enter the inner for loop would be considered
+        # a "nicer" solution, it would also have the potential to _eventually_
+        # exceed the maximum recursion depth (in cPython, other implementations
+        # might support tail optimized calls).
+        # This is why this function is written with a double while loop.
+        while not self._kill:
+            try:
+                self._receive_loop(callback, parser)
+            except (BrokenPipeError, socket.error) as e:
+                logger.error('Socket connection dropped')
+                logger.exception(e)
+
+            if self._kill or not reconnect:
+                logger.info('Exiting OgnClient.receive()')
+                break
+
+            self.connect()
+
+    def _receive_loop(self, callback, parser):
+        """
+        The main loop of the receive function.
+
+        :param callback: the callback function which takes one parameter
+                         (the received message)
+        :type callback: callable
+        :param parser: function that parses the APRS messages or None if
+                       callback should receive raw messages
+        :type parser: callable or None
         """
 
         line = self._sock_file.readline().strip()
-        while line != '':
+        while line != '' and not self._kill:
             logger.debug('Received APRS message: %s', line)
+
+            if parser:
+                raise NotImplementedError('Parsing of APRS messages is not'
+                                          'implemented yet')
+            else:
+                logger.debug('Returning raw APRS message to callback')
+                return_value = line
+
+            callback(return_value)
+            self._keepalive()
+
             line = self._sock_file.readline().strip()
 
     def send(self, message):
@@ -119,6 +174,19 @@ class OgnClient:
         message_nl = message.strip('\n') + '\n'
         logger.info('Sending: %s', message_nl)
         self._socket.sendall(message_nl.encode())
+        self._last_send = time.time()
+
+    def _keepalive(self):
+        """
+        Sends the keep alive message to APRS server (if necessary).
+        """
+
+        td = time.time() - self._last_send
+
+        if td > self.SOCKET_KEEPALIVE:
+            logger.info('No messages sent for %.0f seconds; sending keepalive',
+                        td)
+            self.send('#keepalive')
 
     def _gen_auth_message(self):
         """
