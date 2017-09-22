@@ -12,3 +12,11 @@ class ParseError(Exception):
     """
 
     pass
+
+
+class ParserNotFoundError(Exception):
+    """
+    Parser for the given destto name was not registered with the meta class.
+    """
+
+    pass
