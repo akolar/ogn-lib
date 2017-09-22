@@ -98,7 +98,7 @@ class Parser(metaclass=ParserBase):
         data.update(Parser._parse_header(header))
 
         if comment:
-            data.update(Parser.parse_comment(comment))
+            data.update(Parser._parse_comment(comment))
 
         return data
 
@@ -219,6 +219,11 @@ class Parser(metaclass=ParserBase):
             location *= -1
 
         return location
+
+    @staticmethod
+    def _parse_comment(comment):
+        logger.warn('Parser._parse_comment method not overriden')
+        return {}
 
 
 class APRS(Parser):
