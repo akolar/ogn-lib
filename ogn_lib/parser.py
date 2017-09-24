@@ -98,7 +98,7 @@ class Parser(metaclass=ParserBase):
         data.update(Parser._parse_header(header))
 
         if comment:
-            data.update(Parser._parse_comment(comment))
+            data.update(Parser._parse_comment(comment[0]))
 
         return data
 
