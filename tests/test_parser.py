@@ -1,15 +1,51 @@
 import pytest
 from datetime import datetime, timedelta
-from ogn_lib import parser
+from ogn_lib import exceptions, parser
 
 
 class TestParserBase:
 
-    def test_new(self):
-        pass
+    def test_new_no_id(self):
+        class Callsign(parser.Parser):
+            pass
 
-    def test_call(self):
-        pass
+        assert 'Callsign' in parser.ParserBase.parsers
+
+    def test_new_single_id(self):
+        class Callsign(parser.Parser):
+            __destto__ = 'CALL1234'
+
+        assert 'CALL1234' in parser.ParserBase.parsers
+
+    def test_new_multi_id(self):
+        class Callsign(parser.Parser):
+            __destto__ = ['CALL1234', 'CALL4321']
+
+        assert 'CALL1234' in parser.ParserBase.parsers
+        assert 'CALL4321' in parser.ParserBase.parsers
+
+    def test_new_wrong_id(self):
+        with pytest.raises(TypeError):
+            class Callsign(parser.Parser):
+                __destto__ = 12345678
+
+    def test_call(self, mocker):
+        class Callsign(parser.Parser):
+            __destto__ = 'CALLSIGN'
+
+            parse_message = mocker.Mock()
+
+        msg = ('FLRDD83BC>CALLSIGN,qAS,EDLF:/163148h5124.56N/00634.42E\''
+               '276/075/A=001551')
+        parser.ParserBase.__call__(msg)
+
+        Callsign.parse_message.assert_called_once_with(msg)
+
+    def test_call_no_parser(self):
+        with pytest.raises(exceptions.ParserNotFoundError):
+            parser.ParserBase.__call__(
+                'FLRDD83BC>APRS-1,qAS,EDLF:/163148h5124.56N/00634.42E\''
+                '276/075/A=001551')
 
 
 class TestParser:
