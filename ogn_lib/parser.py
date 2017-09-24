@@ -135,7 +135,7 @@ class Parser(metaclass=ParserBase):
         if len(fields) == 3:  # standard message
             relayer = None
         elif len(fields) == 4:  # relayed message
-            relayer = fields[2].strip('*')
+            relayer = fields[1].strip('*')
         else:
             raise ValueError('Unknown header format: {}'.format(header))
 
