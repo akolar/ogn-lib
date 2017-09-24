@@ -162,3 +162,9 @@ class TestParser:
 
     def test_parse_comment(self):
         assert parser.Parser._parse_comment("1 2 3 4") == {}
+
+    def test_call(self, mocker):
+        msg = 'FLR123456>APRS,reminder_of_message'
+        with mocker.patch('ogn_lib.parser.APRS.parse_message'):
+            parser.APRS(msg)
+            parser.APRS.parse_message.assert_called_once_with(msg)
