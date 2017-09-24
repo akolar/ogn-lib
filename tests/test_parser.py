@@ -166,5 +166,5 @@ class TestParser:
     def test_call(self, mocker):
         msg = 'FLR123456>APRS,reminder_of_message'
         with mocker.patch('ogn_lib.parser.APRS.parse_message'):
-            parser.APRS(msg)
+            parser.Parser(msg)
             parser.APRS.parse_message.assert_called_once_with(msg)
