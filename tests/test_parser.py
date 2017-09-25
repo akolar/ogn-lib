@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timedelta
-from ogn_lib import exceptions, parser
+from ogn_lib import exceptions, parser, constants
 
 
 class TestParserBase:
@@ -168,3 +168,42 @@ class TestParser:
         with mocker.patch('ogn_lib.parser.APRS.parse_message'):
             parser.Parser(msg)
             parser.APRS.parse_message.assert_called_once_with(msg)
+
+
+class TestAPRS:
+
+    def test_parse_comment(self):
+        msg = ('!12! id06DF0A52 +020fpm +0.0rot FL000.00 55.2dB 0e -6.2kHz'
+               ' gps4x6 s6.01 h03 rDDACC4 +5.0dBm hearD7EA hearDA95')
+        data = parser.APRS._parse_comment(msg)
+        print(data)
+        assert data == {
+            'additional_decimal': {'latitude': 1, 'longitude': 2},
+            'address_type': constants.AddressType.flarm,
+            'aircraft_type': constants.AirplaneType.glider,
+            'do_not_track': False,
+            'error_count': 0,
+            'flarm_hardware': 3,
+            'flarm_id': 'DDACC4',
+            'flarm_software': '6.01',
+            'flight_level': 0.0,
+            'frequency_offset': -6.2,
+            'gps_quality': {'horizontal': 4, 'vertical': 6},
+            'other_devices': ['D7EA', 'DA95'],
+            'power_ratio': 5.0,
+            'signal_to_noise_ratio': 55.2,
+            'stealth': False,
+            'turn_rate': 0.0,
+            'uid': '06DF0A52',
+            'vertical_speed': 6.096
+        }
+
+    def test_parse_id_string(self):
+        uid = '06DF0A52'
+
+        data = parser.APRS._parse_id_string(uid)
+        assert data['uid'] == uid
+        assert not data['stealth']
+        assert not data['do_not_track']
+        assert data['aircraft_type'] is constants.AirplaneType.glider
+        assert data['address_type'] is constants.AddressType.flarm
