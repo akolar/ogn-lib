@@ -2,7 +2,7 @@ sudo: false
 language: python
 
 install:
-  - pip install tox codecov
+  - pip install tox codecov pytest-cov
 
 script:
   - tox
@@ -21,4 +21,5 @@ matrix:
       env: TOXENV='flake8'
 
 after_success:
+  - py.test --verbose --cov-report term --cov-report xml --cov=ogn_lib tests
   - codecov
