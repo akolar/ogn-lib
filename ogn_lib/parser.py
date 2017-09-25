@@ -82,8 +82,8 @@ class Parser(metaclass=ParserBase):
     class.
     """
 
-    @staticmethod
-    def parse_message(raw_message):
+    @classmethod
+    def parse_message(cls, raw_message):
         """
         Parses the fields of a raw APRS message to a dictionary.
 
@@ -99,7 +99,7 @@ class Parser(metaclass=ParserBase):
         data.update(Parser._parse_header(header))
 
         if comment:
-            data.update(Parser._parse_comment(comment[0]))
+            data.update(cls._parse_comment(comment[0]))
 
         return data
 
