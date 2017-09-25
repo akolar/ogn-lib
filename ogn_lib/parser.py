@@ -2,7 +2,7 @@ import collections
 import logging
 from datetime import datetime, time, timedelta
 
-from ogn_lib import exceptions, types
+from ogn_lib import constants, exceptions
 
 
 FEET_TO_METERS = 0.3048
@@ -273,8 +273,8 @@ class APRS(Parser):
                 data['frequency_offset'] = float(field[:-3])
             elif field.startswith('gps'):  # (optional) gps quality
                 data['gps_quality'] = {
-                    'vertical': field[5],
-                    'horizontal': field[3]
+                    'vertical': int(field[5]),
+                    'horizontal': int(field[3])
                 }
             elif field.startswith('s'):  # (optional) flarm software version
                 data['flarm_software'] = field[1:]
@@ -307,9 +307,9 @@ class APRS(Parser):
             'uid': id_string,
             'stealth': bool(flags & APRS.FLAGS_STEALTH),
             'do_not_track': bool(flags & APRS.FLAGS_DO_NOT_TRACK),
-            'aircraft_type': types.AirplaneType(
+            'aircraft_type': constants.AirplaneType(
                 (flags & APRS.FLAGS_AIRCRAFT_TYPE) >> 2),
-            'address_type': types.AddressType(flags & APRS.FLAGS_ADDRESS_TYPE)
+            'address_type': constants.AddressType(flags & APRS.FLAGS_ADDRESS_TYPE)
         }
 
 
