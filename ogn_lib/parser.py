@@ -253,10 +253,20 @@ class APRS(Parser):
         fields = comment.split(' ')
         for field in fields:
             if field.startswith('!') and field.endswith('!'):  # 3rd decimal
-                data['additional_decimal'] = {
-                    'latitude': int(field[1]),
-                    'longitude': int(field[2])
-                }
+                update_position = [
+                    {
+                        'target': 'latitude',
+                        'function': lambda x: x + int(field[1]) / 60000
+                    }, {
+                        'target': 'longitude',
+                        'function': lambda x: x + int(field[2]) / 60000
+                    }
+                ]
+                try:
+                    for u in update_position:
+                        data['_update'].append(u)
+                except KeyError:
+                    data['_update'] = update_position
             elif field.startswith('id'):
                 data.update(APRS._parse_id_string(field[2:]))
             elif field.endswith('fpm'):  # vertical speed

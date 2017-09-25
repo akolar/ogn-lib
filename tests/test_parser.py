@@ -176,9 +176,11 @@ class TestAPRS:
         msg = ('!12! id06DF0A52 +020fpm +0.0rot FL000.00 55.2dB 0e -6.2kHz'
                ' gps4x6 s6.01 h03 rDDACC4 +5.0dBm hearD7EA hearDA95')
         data = parser.APRS._parse_comment(msg)
-        print(data)
+        assert len(data['_update']) == 2
+        assert (set(map(lambda x: x['target'], data['_update'])) ==
+                {'latitude', 'longitude'})
+        del data['_update']
         assert data == {
-            'additional_decimal': {'latitude': 1, 'longitude': 2},
             'address_type': constants.AddressType.flarm,
             'aircraft_type': constants.AirplaneType.glider,
             'do_not_track': False,
