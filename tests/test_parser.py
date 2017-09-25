@@ -209,3 +209,33 @@ class TestAPRS:
         assert not data['do_not_track']
         assert data['aircraft_type'] is constants.AirplaneType.glider
         assert data['address_type'] is constants.AddressType.flarm
+
+
+class TestNaviter:
+
+    def test_parse_comment(self):
+        msg = '!W76! id1C4007220E +180fpm +0.0rot'
+        data = parser.Naviter._parse_comment(msg)
+        assert len(data['_update']) == 2
+        assert (set(map(lambda x: x['target'], data['_update'])) ==
+                {'latitude', 'longitude'})
+        del data['_update']
+        assert data == {
+            'address_type': constants.AddressType.naviter,
+            'aircraft_type': constants.AirplaneType.paraglider,
+            'do_not_track': False,
+            'stealth': False,
+            'turn_rate': 0.0,
+            'uid': '1C4007220E',
+            'vertical_speed': 54.864000000000004
+        }
+
+    def test_parse_id_string(self):
+        uid = '1C4007220E'
+
+        data = parser.Naviter._parse_id_string(uid)
+        assert data['uid'] == uid
+        assert not data['stealth']
+        assert not data['do_not_track']
+        assert data['aircraft_type'] is constants.AirplaneType.paraglider
+        assert data['address_type'] is constants.AddressType.naviter

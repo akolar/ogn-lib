@@ -330,6 +330,65 @@ class Naviter(Parser):
 
     __destto__ = ['OGNAVI', 'OGNAVI-1']
 
+    FLAGS_STEALTH = 1 << 15
+    FLAGS_DO_NOT_TRACK = 1 << 14
+    FLAGS_AIRCRAFT_TYPE = 0b1111 << 10
+    FLAGS_ADDRESS_TYPE = 0b111111 << 4
+
     @staticmethod
     def _parse_comment(comment):
-        return {}
+        """
+        Parses the comment string from Naviter's APRS messages.
+
+        :param str comment: comment string
+        :return: parsed comment
+        :rtype: dict
+        """
+
+        data = {}
+        fields = comment.split(' ')
+        for field in fields:
+            if field.startswith('!') and field.endswith('!'):  # 3rd decimal
+                update_position = [
+                    {
+                        'target': 'latitude',
+                        'function': lambda x: x + int(field[1]) / 60000
+                    }, {
+                        'target': 'longitude',
+                        'function': lambda x: x + int(field[2]) / 60000
+                    }
+                ]
+                try:
+                    for u in update_position:
+                        data['_update'].append(u)
+                except KeyError:
+                    data['_update'] = update_position
+            elif field.startswith('id'):
+                data.update(Naviter._parse_id_string(field[2:]))
+            elif field.endswith('fpm'):  # vertical speed
+                data['vertical_speed'] = int(field[:-3]) * FEET_TO_METERS
+            elif field.endswith('rot'):  # turn rate
+                data['turn_rate'] = float(field[:-3]) * HPM_TO_DEGS
+
+        return data
+
+    @staticmethod
+    def _parse_id_string(id_string):
+        """
+        Parses the information encoded in the id string.
+
+        :param str id_string: unique identification string
+        :return: parsed information
+        :rtype: dict
+        """
+
+        flags = int(id_string[:4], 16)
+        return {
+            'uid': id_string,
+            'stealth': bool(flags & Naviter.FLAGS_STEALTH),
+            'do_not_track': bool(flags & Naviter.FLAGS_DO_NOT_TRACK),
+            'aircraft_type': constants.AirplaneType(
+                (flags & Naviter.FLAGS_AIRCRAFT_TYPE) >> 10),
+            'address_type': constants.AddressType(
+                (flags & Naviter.FLAGS_ADDRESS_TYPE) >> 4)
+        }
