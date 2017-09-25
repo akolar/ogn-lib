@@ -2,11 +2,12 @@ import collections
 import logging
 from datetime import datetime, time, timedelta
 
-from ogn_lib import exceptions
+from ogn_lib import exceptions, types
 
 
 FEET_TO_METERS = 0.3048
 KNOTS_TO_MS = 1852 / 3600  # ratio between nautical knots and m/s
+HPM_TO_DEGS = 180 / 60  # ratio between half turn per minute and degrees per s
 
 TD_1DAY = timedelta(days=1)
 
@@ -233,9 +234,83 @@ class APRS(Parser):
 
     __destto__ = 'APRS'
 
+    FLAGS_STEALTH = 1 << 7
+    FLAGS_DO_NOT_TRACK = 1 << 6
+    FLAGS_AIRCRAFT_TYPE = 0b1111 << 2
+    FLAGS_ADDRESS_TYPE = 0b11
+
     @staticmethod
     def _parse_comment(comment):
-        return {}
+        """
+        Parses the comment string from APRS messages.
+
+        :param str comment: comment string
+        :return: parsed comment
+        :rtype: dict
+        """
+
+        data = {}
+        fields = comment.split(' ')
+        for field in fields:
+            if field.startswith('!') and field.endswith('!'):  # 3rd decimal
+                data['additional_decimal'] = {
+                    'latitude': int(field[1]),
+                    'longitude': int(field[2])
+                }
+            elif field.startswith('id'):
+                data.update(APRS._parse_id_string(field[2:]))
+            elif field.endswith('fpm'):  # vertical speed
+                data['vertical_speed'] = int(field[:-3]) * FEET_TO_METERS
+            elif field.endswith('rot'):  # turn rate
+                data['turn_rate'] = float(field[:-3]) * HPM_TO_DEGS
+            elif field.startswith('FL'):  # (optional) flight level
+                data['flight_level'] = float(field[2:])
+            elif field.endswith('dB'):  # signal to noise ratio
+                data['signal_to_noise_ratio'] = float(field[:-2])
+            elif field.endswith('e'):  # error count
+                data['error_count'] = int(field[:-1])
+            elif field.endswith('kHz'):  # frequency offset
+                data['frequency_offset'] = float(field[:-3])
+            elif field.startswith('gps'):  # (optional) gps quality
+                data['gps_quality'] = {
+                    'vertical': field[5],
+                    'horizontal': field[3]
+                }
+            elif field.startswith('s'):  # (optional) flarm software version
+                data['flarm_software'] = field[1:]
+            elif field.startswith('r'):  # (optional) flarm id
+                data['flarm_id'] = field[1:]
+            elif field.endswith('dBm'):  # (optional) power ratio
+                data['power_ratio'] = float(field[:-3])
+            elif field.startswith('hear'):  # (optional) other devices heard
+                try:
+                    data['other_devices'].append(field[4:])
+                except KeyError:
+                    data['other_devices'] = [field[4:]]
+            elif field.startswith('h'):  # (optional) flarm hardware version
+                data['flarm_hardware'] = int(field[1:], 16)
+
+        return data
+
+    @staticmethod
+    def _parse_id_string(id_string):
+        """
+        Parses the information encoded in the id string.
+
+        :param str id_string: unique identification string
+        :return: parsed information
+        :rtype: dict
+        """
+
+        flags = int(id_string[:2], 16)
+        return {
+            'uid': id_string,
+            'stealth': bool(flags & APRS.FLAGS_STEALTH),
+            'do_not_track': bool(flags & APRS.FLAGS_DO_NOT_TRACK),
+            'aircraft_type': types.AirplaneType(
+                (flags & APRS.FLAGS_AIRCRAFT_TYPE) >> 2),
+            'address_type': types.AddressType(flags & APRS.FLAGS_ADDRESS_TYPE)
+        }
 
 
 class Naviter(Parser):
