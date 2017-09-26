@@ -232,6 +232,14 @@ class Parser(metaclass=ParserBase):
 
     @staticmethod
     def _parse_comment(comment):
+        """
+        Parses the comment string from APRS messages.
+
+        :param str comment: comment string
+        :return: parsed comment
+        :rtype: dict
+        """
+
         logger.warn('Parser._parse_comment method not overriden')
         return {}
 
