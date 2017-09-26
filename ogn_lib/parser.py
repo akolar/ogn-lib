@@ -247,7 +247,6 @@ class Parser(metaclass=ParserBase):
         full_ts = datetime.combine(datetime.utcnow(), ts)
 
         now = datetime.utcnow()
-        print(now, full_ts)
 
         td = (now - full_ts).total_seconds()
         if td < -300:
