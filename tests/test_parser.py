@@ -29,6 +29,12 @@ class TestParserBase:
             class Callsign(parser.Parser):
                 __destto__ = 12345678
 
+    def test_set_default(self):
+        class Callsign(parser.Parser):
+            __default__ = True
+
+        assert parser.ParserBase.default is Callsign
+
     def test_call(self, mocker):
         class Callsign(parser.Parser):
             __destto__ = 'CALLSIGN'
@@ -51,9 +57,22 @@ class TestParserBase:
 
     def test_call_no_parser(self):
         with pytest.raises(exceptions.ParserNotFoundError):
+            parser.ParserBase.default = None
             parser.ParserBase.__call__(
                 'FLRDD83BC>APRS-1,qAS,EDLF:/163148h5124.56N/00634.42E\''
                 '276/075/A=001551')
+
+    def test_call_default(self, mocker):
+        class Callsign(parser.Parser):
+            __default__ = True
+
+            parse_message = mocker.Mock()
+
+        msg = ('FLRDD83BC>Unknown,qAS,EDLF:/163148h5124.56N/00634.42E\''
+               '276/075/A=001551')
+        parser.ParserBase.__call__(msg)
+
+        Callsign.parse_message.assert_called_once_with(msg)
 
 
 class TestParser:

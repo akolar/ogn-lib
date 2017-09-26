@@ -22,6 +22,7 @@ class ParserBase(type):
     """
 
     parsers = {}
+    default = None
 
     def __new__(meta, name, bases, dct):
         """
@@ -33,6 +34,7 @@ class ParserBase(type):
 
         class_ = super().__new__(meta, name, bases, dct)
         callsigns = dct.get('__destto__', name)
+        default = dct.get('__default__', False)
 
         if isinstance(callsigns, str):
             logger.debug('Setting %s as a parser for %s messages', name, callsigns)
@@ -44,6 +46,9 @@ class ParserBase(type):
         else:
             raise TypeError('instance of __destto__ should be either a sequence'
                             'or a string; is {}'.format(type(callsigns)))
+
+        if default:
+            meta.default = class_
 
         return class_
 
@@ -70,9 +75,15 @@ class ParserBase(type):
             parser = cls.parsers[destto]
             logger.debug('Using %s parser for %s', parser, raw_message)
         except KeyError:
-            raise exceptions.ParserNotFoundError(
-                'Parser for a destto name {} not found; found: {}'
-                .format(destto, list(cls.parsers.keys())))
+            logger.warn('Parser for a destto name %s not found; found: %s',
+                        destto, list(cls.parsers.keys()))
+
+            if cls.default:
+                parser = cls.default
+            else:
+                raise exceptions.ParserNotFoundError(
+                    'Parser for a destto name {} not found; found: {}'
+                    .format(destto, list(cls.parsers.keys())))
 
         return parser.parse_message(raw_message)
 
@@ -85,6 +96,8 @@ class Parser(metaclass=ParserBase):
     with the values returned by the _parse_comment(comment) of the extending
     class.
     """
+
+    __default__ = True
 
     @classmethod
     def parse_message(cls, raw_message):
