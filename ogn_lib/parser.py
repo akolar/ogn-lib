@@ -116,7 +116,7 @@ class Parser(metaclass=ParserBase):
         return data
 
     @staticmethod
-    def _parse_header(header, pos_separator='/', attrs_separator='\''):
+    def _parse_header(header):
         """
         Parses the APRS message header.
 
@@ -131,9 +131,7 @@ class Parser(metaclass=ParserBase):
         origin, position = header.split(':/', 1)
 
         data = Parser._parse_origin(origin)
-        data.update(Parser._parse_position(position,
-                                           pos_separator=pos_separator,
-                                           attrs_separator=attrs_separator))
+        data.update(Parser._parse_position(position))
 
         return data
 
@@ -161,7 +159,7 @@ class Parser(metaclass=ParserBase):
         return data
 
     @staticmethod
-    def _parse_position(pos_header, pos_separator='/', attrs_separator='\''):
+    def _parse_position(pos_header):
         """
         Parses the position information, timestamp, altitude, heading and
         ground speed from an APRS message.
@@ -174,8 +172,9 @@ class Parser(metaclass=ParserBase):
         """
 
         timestamp = pos_header[0:6]
-        position, attrs = pos_header[7:].split(attrs_separator, 1)
-        lat, lon = position.split(pos_separator)
+        lat = pos_header[7:15]
+        lon = pos_header[16:25]
+        attrs = pos_header[26:]
 
         data = {
             'timestamp': Parser._parse_timestamp(timestamp),
@@ -539,8 +538,7 @@ class ServerParser:
         from_, header = raw_message.split('>', 1)
 
         data = {'from': from_}
-        data.update(Parser._parse_header(header, pos_separator='I',
-                                         attrs_separator='&'))
+        data.update(Parser._parse_header(header))
 
         return data
 
@@ -556,7 +554,10 @@ class ServerParser:
 
         from_, body = raw_message.split('>', 1)
         header, comment = body.split(' ', 1)
-        origin, timestamp = header.split(':/')
+
+        sep_idx = header.find(':')
+        origin = header[:sep_idx]
+        timestamp = header[sep_idx + 2:]
 
         data = {'from': from_}
         data.update(Parser._parse_origin(origin))

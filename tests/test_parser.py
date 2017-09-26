@@ -117,8 +117,7 @@ class TestParser:
                 data = parser.Parser._parse_header('origin:/position')
 
                 parser.Parser._parse_origin.assert_called_once_with('origin')
-                parser.Parser._parse_position.assert_called_once_with(
-                    'position', pos_separator='/', attrs_separator='\'')
+                parser.Parser._parse_position.assert_called_once_with('position')
 
                 assert data == {'a': 1, 'b': 2}
 
@@ -127,12 +126,9 @@ class TestParser:
                           return_value={'a': 1}):
             with mocker.patch('ogn_lib.parser.Parser._parse_position',
                               return_value={'b': 2}):
-                parser.Parser._parse_header('origin:/position',
-                                            pos_separator='p',
-                                            attrs_separator='a')
+                parser.Parser._parse_header('origin:/position')
 
-                parser.Parser._parse_position.assert_called_once_with(
-                    'position', pos_separator='p', attrs_separator='a')
+                parser.Parser._parse_position.assert_called_once_with('position')
 
     def test_parse_origin(self):
         data = parser.Parser._parse_origin('FMT-VERS,qAS,RECEIVER')
@@ -161,9 +157,7 @@ class TestParser:
             with mocker.patch('ogn_lib.parser.Parser._parse_attributes',
                               return_value={}):
 
-                data = parser.Parser._parse_position(msg,
-                                                     pos_separator=p_separator,
-                                                     attrs_separator=a_separator)
+                data = parser.Parser._parse_position(msg)
 
                 parser.Parser._parse_attributes.assert_called_once_with(
                     '200/100/A=00042')
@@ -173,11 +167,11 @@ class TestParser:
         assert data['longitude'] == 2
 
     def test_parse_position(self, mocker):
-        msg = '010203h0100.00N/00200.00\'200/100/A=00042'
+        msg = '010203h0100.00N/00200.00E\'200/100/A=00042'
         self._parse_position_separator(mocker, '/', '\'', msg)
 
     def test_parse_position_alt_separator(self, mocker):
-        msg = '010203h0100.00NI00200.00&200/100/A=00042'
+        msg = '010203h0100.00NI00200.00E&200/100/A=00042'
         self._parse_position_separator(mocker, 'I', '&', msg)
 
     def test_parse_attrs(self):
@@ -384,7 +378,7 @@ class TestServerParser:
             data = parser.ServerParser.parse_beacon(msg)
             parser.Parser._parse_header.assert_called_once_with(
                 'APRS,TCPIP*,qAC,GLIDERN2:/211635h4902.45NI01429.51E&000/000/'
-                'A=001689', pos_separator='I', attrs_separator='&')
+                'A=001689')
 
         assert data['from']
 
