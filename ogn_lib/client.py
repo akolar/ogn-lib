@@ -152,9 +152,17 @@ class OgnClient:
         while line != '' and not self._kill:
             logger.debug('Received APRS message: %s', line)
 
+            if line.startswith('#'):
+                logger.debug('Received server message: %s', line)
+                line = self._sock_file.readline().strip()
+                continue
+
             if parser:
-                raise NotImplementedError('Parsing of APRS messages is not'
-                                          'implemented yet')
+                logger.debug('Using %s for parsing', parser)
+                try:
+                    return_value = parser(line)
+                except Exception as e:
+                    logger.exception(e)
             else:
                 logger.debug('Returning raw APRS message to callback')
                 return_value = line

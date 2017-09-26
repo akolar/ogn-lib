@@ -118,8 +118,9 @@ class TestClient:
         with mocker.patch('socket.create_connection', return_value=sock):
             cl = client.OgnClient('username')
             cl.connect()
-            with pytest.raises(NotImplementedError):
-                cl._receive_loop(lambda x: None, lambda x: x)
+            cb = mocker.MagicMock(side_effect=lambda x: cl.disconnect())
+            cl._receive_loop(cb, None)
+            cl._receive_loop(cb, lambda x: x)
 
     def test_receive_loop_raw(self, mocker):
         sock = self._get_mocked_socket(mocker, True)
