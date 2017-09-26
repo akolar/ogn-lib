@@ -88,7 +88,7 @@ class TestParser:
                               return_value=data):
                 with mocker.patch('ogn_lib.parser.Parser._update_data'):
                     parser.Parser.parse_message(msg)
-                    parser.Parser._update_data.assert_called()
+                    assert parser.Parser._update_data.call_count == 1
 
     def test_parse_msg_comment(self, mocker):
         with mocker.patch('ogn_lib.parser.Parser._parse_header',
