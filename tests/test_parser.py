@@ -163,6 +163,25 @@ class TestParser:
     def test_parse_comment(self):
         assert parser.Parser._parse_comment("1 2 3 4") == {}
 
+    def test_get_location_update_func(self):
+        fn = parser.Parser._get_location_update_func(0)
+        assert 1 == fn(1)
+
+    def test_update_location_decimal_same(self):
+        existing = 1
+        new = parser.Parser._update_location_decimal(existing, 0)
+        assert new == existing
+
+    def test_update_location_decimal_positive(self):
+        existing = 1
+        new = parser.Parser._update_location_decimal(existing, 3)
+        assert new > existing
+
+    def test_update_location_decimal_negative(self):
+        existing = -1
+        new = parser.Parser._update_location_decimal(existing, 3)
+        assert new < existing
+
     def test_call(self, mocker):
         msg = 'FLR123456>APRS,reminder_of_message'
         with mocker.patch('ogn_lib.parser.APRS.parse_message'):
@@ -173,7 +192,7 @@ class TestParser:
 class TestAPRS:
 
     def test_parse_comment(self):
-        msg = ('!12! id06DF0A52 +020fpm +0.0rot FL000.00 55.2dB 0e -6.2kHz'
+        msg = ('!W12! id06DF0A52 +020fpm +0.0rot FL000.00 55.2dB 0e -6.2kHz'
                ' gps4x6 s6.01 h03 rDDACC4 +5.0dBm hearD7EA hearDA95')
         data = parser.APRS._parse_comment(msg)
         assert len(data['_update']) == 2

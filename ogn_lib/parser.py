@@ -1,4 +1,5 @@
 import collections
+import functools
 import logging
 from datetime import datetime, time, timedelta
 
@@ -226,6 +227,37 @@ class Parser(metaclass=ParserBase):
         logger.warn('Parser._parse_comment method not overriden')
         return {}
 
+    @staticmethod
+    def _get_location_update_func(update_with):
+        """
+        Builds a partial function for updating location with 3rd additional
+        decimal.
+
+        :param int update_with: 3rd decimal
+        :return: partial function updating position with 3rd digit
+        :rtype: callable
+        """
+
+        return functools.partial(Parser._update_location_decimal,
+                                 update=update_with)
+
+    @staticmethod
+    def _update_location_decimal(existing, update):
+        """
+        Updates location with 3rd additional decimal.
+
+        :param float existing: existing value
+        :param int update: 3rd decimal
+        :return: new location
+        :rtype: float
+        """
+
+        delta = update
+        if existing < 0:
+            delta *= -1
+
+        return existing + delta / 60000
+
 
 class APRS(Parser):
     """
@@ -253,13 +285,15 @@ class APRS(Parser):
         fields = comment.split(' ')
         for field in fields:
             if field.startswith('!') and field.endswith('!'):  # 3rd decimal
+                lat_dig = int(field[2])
+                lon_dig = int(field[3])
                 update_position = [
                     {
                         'target': 'latitude',
-                        'function': lambda x: x + int(field[1]) / 60000
+                        'function': Parser._get_location_update_func(lat_dig)
                     }, {
                         'target': 'longitude',
-                        'function': lambda x: x + int(field[2]) / 60000
+                        'function': Parser._get_location_update_func(lon_dig)
                     }
                 ]
                 try:
@@ -349,13 +383,15 @@ class Naviter(Parser):
         fields = comment.split(' ')
         for field in fields:
             if field.startswith('!') and field.endswith('!'):  # 3rd decimal
+                lat_dig = int(field[2])
+                lon_dig = int(field[3])
                 update_position = [
                     {
                         'target': 'latitude',
-                        'function': lambda x: x + int(field[1]) / 60000
+                        'function': Parser._get_location_update_func(lat_dig)
                     }, {
                         'target': 'longitude',
-                        'function': lambda x: x + int(field[2]) / 60000
+                        'function': Parser._get_location_update_func(lon_dig)
                     }
                 ]
                 try:
