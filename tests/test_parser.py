@@ -41,6 +41,14 @@ class TestParserBase:
 
         Callsign.parse_message.assert_called_once_with(msg)
 
+    def test_call_server(self, mocker):
+        with mocker.patch('ogn_lib.parser.ServerParser.parse_message'):
+            msg = ('LKHS>APRS,TCPIP*,qAC,GLIDERN2:/211635h4902.45NI01429.51E&'
+                   '000/000/A=001689')
+            parser.ParserBase.__call__(msg)
+
+            parser.ServerParser.parse_message.assert_called_once_with(msg)
+
     def test_call_no_parser(self):
         with pytest.raises(exceptions.ParserNotFoundError):
             parser.ParserBase.__call__(
@@ -109,8 +117,22 @@ class TestParser:
                 data = parser.Parser._parse_header('origin:/position')
 
                 parser.Parser._parse_origin.assert_called_once_with('origin')
-                parser.Parser._parse_position.assert_called_once_with('position')
+                parser.Parser._parse_position.assert_called_once_with(
+                    'position', pos_separator='/', attrs_separator='\'')
+
                 assert data == {'a': 1, 'b': 2}
+
+    def test_parse_header_separators(self, mocker):
+        with mocker.patch('ogn_lib.parser.Parser._parse_origin',
+                          return_value={'a': 1}):
+            with mocker.patch('ogn_lib.parser.Parser._parse_position',
+                              return_value={'b': 2}):
+                parser.Parser._parse_header('origin:/position',
+                                            pos_separator='p',
+                                            attrs_separator='a')
+
+                parser.Parser._parse_position.assert_called_once_with(
+                    'position', pos_separator='p', attrs_separator='a')
 
     def test_parse_origin(self):
         data = parser.Parser._parse_origin('FMT-VERS,qAS,RECEIVER')
@@ -132,26 +154,57 @@ class TestParser:
         with pytest.raises(ValueError):
             parser.Parser._parse_origin('FMT-VERS,qAS')
 
-    def test_parse_position(self, mocker):
+    def _parse_position_separator(self, mocker, p_separator, a_separator, msg):
         c_time = datetime(2017, 1, 1, 1, 2, 3)
         with mocker.patch('ogn_lib.parser.Parser._parse_timestamp',
                           return_value=c_time):
-            data = parser.Parser._parse_position(
-                '010203h0100.00N/00200.00\'200/100/A=00042')
+            with mocker.patch('ogn_lib.parser.Parser._parse_attributes',
+                              return_value={}):
+
+                data = parser.Parser._parse_position(msg,
+                                                     pos_separator=p_separator,
+                                                     attrs_separator=a_separator)
+
+                parser.Parser._parse_attributes.assert_called_once_with(
+                    '200/100/A=00042')
 
         assert data['timestamp'] == c_time
         assert data['latitude'] == 1
         assert data['longitude'] == 2
-        assert data['heading'] == 200
-        assert abs(data['ground_speed'] - 51.44447) < 0.01
-        assert abs(data['altitude'] - 12.8016) < 0.01
 
-    def test_parse_position_no_hdg_speed(self):
+    def test_parse_position(self, mocker):
+        msg = '010203h0100.00N/00200.00\'200/100/A=00042'
+        self._parse_position_separator(mocker, '/', '\'', msg)
+
+    def test_parse_position_alt_separator(self, mocker):
+        msg = '010203h0100.00NI00200.00&200/100/A=00042'
+        self._parse_position_separator(mocker, 'I', '&', msg)
+
+    def test_parse_attrs(self):
+        pass
+
+    def test_parse_attrs_na_hdg_speed(self):
         data = parser.Parser._parse_position(
             '010203h0100.00N/00200.00\'000/000/A=00042')
 
         assert data['heading'] is None
         assert data['ground_speed'] is None
+
+    def test_parse_attrs_no_hdg_speed(self):
+        data = parser.Parser._parse_position(
+            '010203h0100.00N/00200.00\'/A=00042')
+
+        assert data['heading'] is None
+        assert data['ground_speed'] is None
+        assert data['altitude'] == 12.8016
+
+    def test_parse_attrs_no_alt(self):
+        data = parser.Parser._parse_position(
+            '010203h0100.00N/00200.00\'001/002')
+
+        assert data['heading'] == 1
+        assert abs(data['ground_speed'] - 1.028889) < 0.001
+        assert data['altitude'] is None
 
     def test_parse_timestamp_past(self):
         for i in range(24):
@@ -301,3 +354,56 @@ class TestNaviter:
         assert not data['do_not_track']
         assert data['aircraft_type'] is constants.AirplaneType.paraglider
         assert data['address_type'] is constants.AddressType.naviter
+
+
+class TestServerParser:
+
+    def test_parse_message_beacon(self, mocker):
+        with mocker.patch('ogn_lib.parser.ServerParser.parse_beacon'):
+            msg = ('LKHS>APRS,TCPIP*,qAC,GLIDERN2:/211635h4902.45NI01429.51E&'
+                   '000/000/A=001689')
+
+            parser.ServerParser.parse_message(msg)
+            parser.ServerParser.parse_beacon.assert_called_once_with(msg)
+
+    def test_parse_message_status(self, mocker):
+        with mocker.patch('ogn_lib.parser.ServerParser.parse_status'):
+            msg = (
+                'LKHS>APRS,TCPIP*,qAC,GLIDERN2:/211635h v0.2.6.ARM CPU:0.2 '
+                'RAM:777.7/972.2MB NTP:3.1ms/-3.8ppm 4.902V 0.583A +33.6C 14/'
+                '16Acfts[1h] RF:+62-0.8ppm/+33.66dB/+19.4dB@10km[112619]/+25.0'
+                'dB@10km[8/15]')
+
+            parser.ServerParser.parse_message(msg)
+            parser.ServerParser.parse_status.assert_called_once_with(msg)
+
+    def test_parse_beacon(self, mocker):
+        with mocker.patch('ogn_lib.parser.Parser._parse_header', return_value={}):
+            msg = ('LKHS>APRS,TCPIP*,qAC,GLIDERN2:/211635h4902.45NI01429.51E&'
+                   '000/000/A=001689')
+            data = parser.ServerParser.parse_beacon(msg)
+            parser.Parser._parse_header.assert_called_once_with(
+                'APRS,TCPIP*,qAC,GLIDERN2:/211635h4902.45NI01429.51E&000/000/'
+                'A=001689', pos_separator='I', attrs_separator='&')
+
+        assert data['from']
+
+    def test_parse_status(self, mocker):
+        msg = (
+            'LKHS>APRS,TCPIP*,qAC,GLIDERN2:/211635h v0.2.6.ARM CPU:0.2 RAM:777'
+            '.7/972.2MB NTP:3.1ms/-3.8ppm 4.902V 0.583A +33.6C 14/16Acfts[1h]'
+            'RF:+62-0.8ppm/+33.66dB/+19.4dB@10km[112619]/+25.0dB@10km[8/15]')
+
+        with mocker.patch('ogn_lib.parser.Parser._parse_origin',
+                          return_value={'origin': 1}):
+            with mocker.patch('ogn_lib.parser.Parser._parse_timestamp',
+                              return_value='ts'):
+                data = parser.ServerParser.parse_status(msg)
+
+                parser.Parser._parse_timestamp.assert_called_once_with(
+                    '211635')
+                parser.Parser._parse_origin.assert_called_once_with(
+                    'APRS,TCPIP*,qAC,GLIDERN2')
+
+        assert data['timestamp'] == 'ts'
+        assert 'origin' in data

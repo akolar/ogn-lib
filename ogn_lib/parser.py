@@ -63,6 +63,9 @@ class ParserBase(type):
         _, body = raw_message.split('>', 1)
         destto, *_ = body.split(',', 1)
 
+        if body.startswith('APRS,TCPIP*,qAC'):  # server message
+            return ServerParser.parse_message(raw_message)
+
         try:
             parser = cls.parsers[destto]
             logger.debug('Using %s parser for %s', parser, raw_message)
@@ -113,12 +116,14 @@ class Parser(metaclass=ParserBase):
         return data
 
     @staticmethod
-    def _parse_header(header):
+    def _parse_header(header, pos_separator='/', attrs_separator='\''):
         """
         Parses the APRS message header.
 
         :param str header: APRS message between the '[callsign]>' and comment
                            field
+        :param str pos_separator: separator for latitude and longitude
+        :param str attrs_separator: separator for attributes substring
         :return: parsed header
         :rtype: dict
         """
@@ -126,7 +131,9 @@ class Parser(metaclass=ParserBase):
         origin, position = header.split(':/', 1)
 
         data = Parser._parse_origin(origin)
-        data.update(Parser._parse_position(position))
+        data.update(Parser._parse_position(position,
+                                           pos_separator=pos_separator,
+                                           attrs_separator=attrs_separator))
 
         return data
 
@@ -154,28 +161,55 @@ class Parser(metaclass=ParserBase):
         return data
 
     @staticmethod
-    def _parse_position(pos_header):
+    def _parse_position(pos_header, pos_separator='/', attrs_separator='\''):
         """
         Parses the position information, timestamp, altitude, heading and
         ground speed from an APRS message.
 
         :param str pos_header: position part of the APRS header
+        :param str pos_separator: separator for latitude and longitude
+        :param str attrs_separator: separator for attributes substring
         :return: parsed position part of the APRS message
         :rtype: dict
         """
 
         timestamp = pos_header[0:6]
-        position, attrs = pos_header[7:].split('\'', 1)
-        lat, lon = position.split('/')
-        heading, speed, altitude = map(lambda x: int(x),
-                                       attrs.replace('A=', '').split('/'))
+        position, attrs = pos_header[7:].split(attrs_separator, 1)
+        lat, lon = position.split(pos_separator)
 
         data = {
             'timestamp': Parser._parse_timestamp(timestamp),
             'latitude': Parser._parse_location(lat),
             'longitude': Parser._parse_location(lon),
-            'altitude': altitude * FEET_TO_METERS
         }
+        data.update(Parser._parse_attributes(attrs))
+
+        return data
+
+    @staticmethod
+    def _parse_attributes(attributes):
+        """
+        Parses the APRS attributes for heading, ground speed and altitude.
+
+        :param str attributes: attributes part of the APRS message
+        :return: parsed attributes
+        :rtype: dict
+        """
+
+        attrs = attributes.split('/')
+        data = {}
+
+        if attrs[-1].startswith('A='):  # has altitude
+            data['altitude'] = int(attrs[-1][2:]) * FEET_TO_METERS
+        else:
+            data['altitude'] = None
+
+        if len(attrs) > 1 and attributes[0] != '/':  # i.e., format is hdg/gsp/?
+            heading = int(attrs[0])
+            speed = int(attrs[1])
+        else:
+            heading = None
+            speed = None
 
         if heading or speed:
             data['heading'] = heading
@@ -468,3 +502,65 @@ class Naviter(Parser):
             'address_type': constants.AddressType(
                 (flags & Naviter.FLAGS_ADDRESS_TYPE) >> 4)
         }
+
+
+class ServerParser:
+    """
+    Parser for server messages.
+    """
+
+    @staticmethod
+    def parse_message(raw_message):
+        """
+        Passes a server message to an appropriate parser.
+
+        :param raw_message: APRS message
+        :return: parsed data
+        :rtype: dict
+        """
+
+        if raw_message.find('CPU') >= 0:
+            data = ServerParser.parse_status(raw_message)
+        else:
+            data = ServerParser.parse_beacon(raw_message)
+
+        return data
+
+    @staticmethod
+    def parse_beacon(raw_message):
+        """
+        Parses server beacon messages.
+
+        :param raw_message: APRS message
+        :return: parsed data
+        :rtype: dict
+        """
+
+        from_, header = raw_message.split('>', 1)
+
+        data = {'from': from_}
+        data.update(Parser._parse_header(header, pos_separator='I',
+                                         attrs_separator='&'))
+
+        return data
+
+    @staticmethod
+    def parse_status(raw_message):
+        """
+        Parses server status messages.
+
+        :param raw_message: APRS message
+        :return: parsed data
+        :rtype: dict
+        """
+
+        from_, body = raw_message.split('>', 1)
+        header, comment = body.split(' ', 1)
+        origin, timestamp = header.split(':/')
+
+        data = {'from': from_}
+        data.update(Parser._parse_origin(origin))
+        data['timestamp'] = Parser._parse_timestamp(timestamp[:-1])
+        data['comment'] = comment
+
+        return data
