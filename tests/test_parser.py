@@ -67,6 +67,29 @@ class TestParser:
                 parser.Parser._parse_header.assert_called_once_with(
                     'APRS,qAS,EDLF:/163148h5124.56N/00634.42E\'276/075/A=001551')
 
+    def test_parse_msg_full(self, mocker):
+        msg = ('NAV07220E>OGNAVI,qAS,NAVITER:/125447h4557.77N/01220.19E\'258/'
+               '056/A=006562 !W76! id1C4007220E +180fpm +0.0rot')
+
+        with mocker.patch('ogn_lib.parser.Parser._parse_comment',
+                          return_value={}):
+            parser.Parser.parse_message(msg)
+            parser.Parser._parse_comment.assert_called_once_with(
+                '!W76! id1C4007220E +180fpm +0.0rot')
+
+    def test_parse_msg_delete_update(self, mocker):
+        msg = ('NAV07220E>OGNAVI,qAS,NAVITER:/125447h4557.77N/01220.19E\'258/'
+               '056/A=006562 !W76! id1C4007220E +180fpm +0.0rot')
+
+        data = {'_update': [{'target': 'key', 'function': lambda x: x}]}
+        with mocker.patch('ogn_lib.parser.Parser._parse_header',
+                          return_value={}):
+            with mocker.patch('ogn_lib.parser.Parser._parse_comment',
+                              return_value=data):
+                with mocker.patch('ogn_lib.parser.Parser._update_data'):
+                    parser.Parser.parse_message(msg)
+                    parser.Parser._update_data.assert_called()
+
     def test_parse_msg_comment(self, mocker):
         with mocker.patch('ogn_lib.parser.Parser._parse_header',
                           return_value={}):
@@ -168,6 +191,26 @@ class TestParser:
         with mocker.patch('ogn_lib.parser.APRS.parse_message'):
             parser.Parser(msg)
             parser.APRS.parse_message.assert_called_once_with(msg)
+
+    def test_update_data(self):
+        updates = [
+            {'target': 'key1', 'function': lambda x: 0},
+            {'target': 'key2', 'function': lambda x: x - 1}
+        ]
+        data = {
+            'key1': 1,
+            'key2': 2
+        }
+
+        assert parser.Parser._update_data(data, updates) == {
+            'key1': 0,
+            'key2': 1
+        }
+
+    def test_update_data_missing(self):
+        # following should pass:
+        parser.Parser._update_data({}, [{'target': 'key',
+                                         'function': lambda x: x}])
 
 
 class TestAPRS:

@@ -99,7 +99,15 @@ class Parser(metaclass=ParserBase):
         data.update(Parser._parse_header(header))
 
         if comment:
-            data.update(cls._parse_comment(comment[0]))
+            comment_data = cls._parse_comment(comment[0])
+
+            try:
+                cls._update_data(data, comment_data['_update'])
+                del comment_data['_update']
+            except KeyError:
+                logger.debug('comment_data[\'_update\'] not set')
+
+            data.update(comment_data)
 
         return data
 
@@ -225,6 +233,31 @@ class Parser(metaclass=ParserBase):
     def _parse_comment(comment):
         logger.warn('Parser._parse_comment method not overriden')
         return {}
+
+    @staticmethod
+    def _update_data(data, updates):
+        """
+        Updates the existing data with values described in `updates`.
+
+        Updates are a list of dictionaries. Each dictionary should have two
+        keys: `target` that contains the key from `data` which should be
+        updated, and `function` which describes the update function.
+
+        :param dict data: existing data
+        :param list updates: list of updates
+        :return: updated data
+        :rtype: dict
+        """
+
+        for update in updates:
+            try:
+                key = update['target']
+                value = data[key]
+                data[key] = update['function'](value)
+            except KeyError:
+                logger.error('Key for update %s not found', update['target'])
+
+        return data
 
 
 class APRS(Parser):
