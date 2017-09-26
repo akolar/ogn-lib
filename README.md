@@ -1,6 +1,6 @@
 # OGN Lib
 
-[![Build Status](https://travis-ci.org/akolar/ogn-lib.svg?branch=master)](https://travis-ci.org/akolar/ogn-lib) [![codecov](https://codecov.io/gh/akolar/ogn-lib/branch/master/graph/badge.svg)](https://codecov.io/gh/akolar/ogn-lib)
+[![Build Status](https://travis-ci.org/akolar/ogn-lib.svg?branch=master)](https://travis-ci.org/akolar/ogn-lib) [![codecov](https://codecov.io/gh/akolar/ogn-lib/branch/master/graph/badge.svg)](https://codecov.io/gh/akolar/ogn-lib) [![PyPI version](https://badge.fury.io/py/OGN-lib.svg)](https://badge.fury.io/py/OGN-lib)
 
 
 ## Overview
