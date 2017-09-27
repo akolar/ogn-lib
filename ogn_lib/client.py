@@ -126,7 +126,7 @@ class OgnClient:
         while not self._kill:
             try:
                 self._receive_loop(callback, parser)
-            except (BrokenPipeError, socket.error) as e:
+            except (BrokenPipeError, ConnectionResetError, socket.error) as e:
                 logger.error('Socket connection dropped')
                 logger.exception(e)
 
