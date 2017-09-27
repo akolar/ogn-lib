@@ -65,27 +65,36 @@ class ParserBase(type):
             message's callsign was not found
         """
 
-        _, body = raw_message.split('>', 1)
-        destto, *_ = body.split(',', 1)
-
-        if body.startswith('APRS,TCPIP*,qAC'):  # server message
-            return ServerParser.parse_message(raw_message)
-
         try:
-            parser = cls.parsers[destto]
-            logger.debug('Using %s parser for %s', parser, raw_message)
-        except KeyError:
-            logger.warn('Parser for a destto name %s not found; found: %s',
-                        destto, list(cls.parsers.keys()))
+            _, body = raw_message.split('>', 1)
+            destto, *_ = body.split(',', 1)
 
-            if cls.default:
-                parser = cls.default
-            else:
-                raise exceptions.ParserNotFoundError(
-                    'Parser for a destto name {} not found; found: {}'
-                    .format(destto, list(cls.parsers.keys())))
+            if 'TCPIP*' in body or ':>' in body or 'qAC' in body:  # server message
+                return ServerParser.parse_message(raw_message)
 
-        return parser.parse_message(raw_message)
+            try:
+                parser = cls.parsers[destto]
+                logger.debug('Using %s parser for %s', parser, raw_message)
+            except KeyError:
+                logger.warn('Parser for a destto name %s not found; found: %s',
+                            destto, list(cls.parsers.keys()))
+
+                if cls.default:
+                    parser = cls.default
+                else:
+                    raise exceptions.ParserNotFoundError(
+                        'Parser for a destto name {} not found; found: {}'
+                        .format(destto, list(cls.parsers.keys())))
+
+            return parser.parse_message(raw_message)
+
+        except exceptions.ParserNotFoundError:
+            raise
+        except Exception as e:
+            msg = 'Failed to parse message: {}'.format(raw_message)
+            logger.error(msg)
+            logger.exception(e)
+            raise exceptions.ParseError(msg)
 
 
 class Parser(metaclass=ParserBase):
@@ -129,6 +138,7 @@ class Parser(metaclass=ParserBase):
 
             data.update(comment_data)
 
+        data['raw'] = raw_message
         return data
 
     @staticmethod
@@ -144,7 +154,9 @@ class Parser(metaclass=ParserBase):
         :rtype: dict
         """
 
-        origin, position = header.split(':/', 1)
+        col_idx = header.find(':')
+        origin = header[:col_idx]
+        position = header[col_idx + 2:]
 
         data = Parser._parse_origin(origin)
         data.update(Parser._parse_position(position))
@@ -187,7 +199,7 @@ class Parser(metaclass=ParserBase):
         :rtype: dict
         """
 
-        timestamp = pos_header[0:6]
+        timestamp = pos_header[0:7]
         lat = pos_header[7:15]
         lon = pos_header[16:25]
         attrs = pos_header[26:]
@@ -240,13 +252,31 @@ class Parser(metaclass=ParserBase):
         """
         Parses the UTC timestamp of an APRS package.
 
-        :param timestamp_str: utc timestamp string in %H%M%S format
+        :param timestamp_str: utc timestamp string in %H%M%S or %d%H%M format
+        :return: parsed timestamp
+        :rtype: datetime.datetime
+        """
+
+        ts_str = timestamp_str[:6]
+        type_ = timestamp_str[-1]
+
+        if type_ == 'h':
+            return Parser._parse_time(ts_str)
+        else:
+            return Parser._parse_datetime(ts_str)
+
+    @staticmethod
+    def _parse_time(timestamp):
+        """
+        Parses the HMS formated timestamp string.
+
+        :param timestamp_str: utc timestamp string in %H%M%S
         :return: parsed timestamp
         :rtype: datetime.datetime
         """
 
         ts = time(*map(lambda x: int(x),
-                       map(lambda x: timestamp_str[x * 2: x * 2 + 2], range(3))))
+                       map(lambda x: timestamp[x * 2: x * 2 + 2], range(3))))
         full_ts = datetime.combine(datetime.utcnow(), ts)
 
         now = datetime.utcnow()
@@ -254,6 +284,27 @@ class Parser(metaclass=ParserBase):
         td = (now - full_ts).total_seconds()
         if td < -300:
             full_ts -= TD_1DAY
+
+        return full_ts
+
+    @staticmethod
+    def _parse_datetime(timestamp):
+        """
+        Parses the HMS formated timestamp string.
+
+        :param timestamp_str: utc timestamp string in %H%M%S
+        :return: parsed timestamp
+        :rtype: datetime.datetime
+        """
+
+        ts = list(map(lambda x: int(x),
+                      map(lambda x: timestamp[x * 2: x * 2 + 2], range(3))))
+
+        now = datetime.now()
+        date_ = datetime(now.year, now.month, ts[0])
+        time_ = time(ts[1], ts[2], 0)
+
+        full_ts = datetime.combine(date_, time_)
 
         return full_ts
 
@@ -352,7 +403,7 @@ class APRS(Parser):
     Parser for the orignal OGN-flavoured APRS messages.
     """
 
-    __destto__ = 'APRS'
+    __destto__ = ['APRS', 'OGFLR', 'OGNTRK']
 
     FLAGS_STEALTH = 1 << 7
     FLAGS_DO_NOT_TRACK = 1 << 6
@@ -404,9 +455,10 @@ class APRS(Parser):
             elif field.endswith('kHz'):  # frequency offset
                 data['frequency_offset'] = float(field[:-3])
             elif field.startswith('gps'):  # (optional) gps quality
+                x_idx = field.find('x')
                 data['gps_quality'] = {
-                    'vertical': int(field[5]),
-                    'horizontal': int(field[3])
+                    'vertical': int(field[x_idx + 1:]),
+                    'horizontal': int(field[3:x_idx])
                 }
             elif field.startswith('s'):  # (optional) flarm software version
                 data['flarm_software'] = field[1:]
@@ -533,11 +585,12 @@ class ServerParser:
         :rtype: dict
         """
 
-        if raw_message.find('CPU') >= 0:
+        if 'CPU' in raw_message or ':>' in raw_message:
             data = ServerParser.parse_status(raw_message)
         else:
             data = ServerParser.parse_beacon(raw_message)
 
+        data['raw'] = raw_message
         return data
 
     @staticmethod
@@ -551,13 +604,16 @@ class ServerParser:
         """
 
         from_, header = raw_message.split('>', 1)
+        position, *comment = header.split(' ', 1)
 
         data = {
             'from': from_,
             'beacon_type': constants.BeaconType.server_beacon
         }
 
-        data.update(Parser._parse_header(header))
+        data.update(Parser._parse_header(position))
+
+        data['comment'] = comment[0] if comment else None
 
         return data
 
@@ -576,7 +632,7 @@ class ServerParser:
 
         sep_idx = header.find(':')
         origin = header[:sep_idx]
-        timestamp = header[sep_idx + 2:]
+        timestamp = header[sep_idx + 2:sep_idx + 9]
 
         data = {
             'from': from_,
@@ -584,7 +640,7 @@ class ServerParser:
         }
 
         data.update(Parser._parse_origin(origin))
-        data['timestamp'] = Parser._parse_timestamp(timestamp[:-1])
+        data['timestamp'] = Parser._parse_timestamp(timestamp)
         data['comment'] = comment
 
         return data

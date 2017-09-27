@@ -126,7 +126,7 @@ class OgnClient:
         while not self._kill:
             try:
                 self._receive_loop(callback, parser)
-            except (BrokenPipeError, socket.error) as e:
+            except (BrokenPipeError, ConnectionResetError, socket.error) as e:
                 logger.error('Socket connection dropped')
                 logger.exception(e)
 
@@ -154,20 +154,15 @@ class OgnClient:
 
             if line.startswith('#'):
                 logger.debug('Received server message: %s', line)
-                line = self._sock_file.readline().strip()
-                continue
-
-            if parser:
-                logger.debug('Using %s for parsing', parser)
+            elif parser:
                 try:
-                    return_value = parser(line)
-                except Exception as e:
+                    callback(parser(line))
+                except ogn_lib.exceptions.ParseError as e:
                     logger.exception(e)
             else:
                 logger.debug('Returning raw APRS message to callback')
-                return_value = line
+                callback(line)
 
-            callback(return_value)
             self._keepalive()
 
             line = self._sock_file.readline().strip()
