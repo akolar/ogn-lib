@@ -190,7 +190,7 @@ class Parser(metaclass=ParserBase):
         :rtype: dict
         """
 
-        timestamp = pos_header[0:6]
+        timestamp = pos_header[0:7]
         lat = pos_header[7:15]
         lon = pos_header[16:25]
         attrs = pos_header[26:]
@@ -243,13 +243,31 @@ class Parser(metaclass=ParserBase):
         """
         Parses the UTC timestamp of an APRS package.
 
-        :param timestamp_str: utc timestamp string in %H%M%S format
+        :param timestamp_str: utc timestamp string in %H%M%S or %d%H%M format
+        :return: parsed timestamp
+        :rtype: datetime.datetime
+        """
+
+        ts_str = timestamp_str[:6]
+        type_ = timestamp_str[-1]
+
+        if type_ == 'h':
+            return Parser._parse_time(ts_str)
+        else:
+            return Parser._parse_datetime(ts_str)
+
+    @staticmethod
+    def _parse_time(timestamp):
+        """
+        Parses the HMS formated timestamp string.
+
+        :param timestamp_str: utc timestamp string in %H%M%S
         :return: parsed timestamp
         :rtype: datetime.datetime
         """
 
         ts = time(*map(lambda x: int(x),
-                       map(lambda x: timestamp_str[x * 2: x * 2 + 2], range(3))))
+                       map(lambda x: timestamp[x * 2: x * 2 + 2], range(3))))
         full_ts = datetime.combine(datetime.utcnow(), ts)
 
         now = datetime.utcnow()
@@ -257,6 +275,27 @@ class Parser(metaclass=ParserBase):
         td = (now - full_ts).total_seconds()
         if td < -300:
             full_ts -= TD_1DAY
+
+        return full_ts
+
+    @staticmethod
+    def _parse_datetime(timestamp):
+        """
+        Parses the HMS formated timestamp string.
+
+        :param timestamp_str: utc timestamp string in %H%M%S
+        :return: parsed timestamp
+        :rtype: datetime.datetime
+        """
+
+        ts = list(map(lambda x: int(x),
+                      map(lambda x: timestamp[x * 2: x * 2 + 2], range(3))))
+
+        now = datetime.now()
+        date_ = datetime(now.year, now.month, ts[0])
+        time_ = time(ts[1], ts[2], 0)
+
+        full_ts = datetime.combine(date_, time_)
 
         return full_ts
 
@@ -581,7 +620,7 @@ class ServerParser:
 
         sep_idx = header.find(':')
         origin = header[:sep_idx]
-        timestamp = header[sep_idx + 2:]
+        timestamp = header[sep_idx + 2:sep_idx + 9]
 
         data = {
             'from': from_,
@@ -589,7 +628,7 @@ class ServerParser:
         }
 
         data.update(Parser._parse_origin(origin))
-        data['timestamp'] = Parser._parse_timestamp(timestamp[:-1])
+        data['timestamp'] = Parser._parse_timestamp(timestamp)
         data['comment'] = comment
 
         return data

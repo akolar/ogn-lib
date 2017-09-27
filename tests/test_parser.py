@@ -222,23 +222,39 @@ class TestParser:
         assert abs(data['ground_speed'] - 1.028889) < 0.001
         assert data['altitude'] is None
 
-    def test_parse_timestamp_past(self):
+    def test_parse_timestamp_h(self, mocker):
+        with mocker.patch('ogn_lib.parser.Parser._parse_time'):
+            parser.Parser._parse_timestamp('010203h')
+            parser.Parser._parse_time.assert_called_once_with('010203')
+
+    def test_parse_timestamp_z(self, mocker):
+        with mocker.patch('ogn_lib.parser.Parser._parse_datetime'):
+            parser.Parser._parse_timestamp('010203z')
+            parser.Parser._parse_datetime.assert_called_once_with('010203')
+
+    def test_parse_time_past(self):
         for i in range(24):
             now = datetime.utcnow()
             other = now - timedelta(hours=i)
-            parsed = parser.Parser._parse_timestamp(other.strftime('%H%M%S'))
+            parsed = parser.Parser._parse_time(other.strftime('%H%M%S'))
 
             delta = (now - parsed).total_seconds()
             assert 0 <= delta <= 86400
 
-    def test_parse_timestamp_future(self):
+    def test_parse_time_future(self):
         for i in range(5):
             now = datetime.utcnow()
             other = now + timedelta(minutes=i)
-            parsed = parser.Parser._parse_timestamp(other.strftime('%H%M%S'))
+            parsed = parser.Parser._parse_time(other.strftime('%H%M%S'))
 
             delta = (parsed - now).total_seconds()
             assert (i - 1) * 60 <= delta <= i * 60
+
+    def test_parse_datetime(self):
+        now = datetime.utcnow()
+        parsed = parser.Parser._parse_datetime(now.strftime('%d%H%M'))
+
+        assert (parsed - now).total_seconds() < 60
 
     def test_parse_location_sign(self):
         assert parser.Parser._parse_location('0100.00N') >= 0
@@ -422,7 +438,7 @@ class TestServerParser:
                 data = parser.ServerParser.parse_status(msg)
 
                 parser.Parser._parse_timestamp.assert_called_once_with(
-                    '211635')
+                    '211635h')
                 parser.Parser._parse_origin.assert_called_once_with(
                     'APRS,TCPIP*,qAC,GLIDERN2')
 
