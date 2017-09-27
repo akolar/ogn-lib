@@ -129,6 +129,7 @@ class Parser(metaclass=ParserBase):
 
             data.update(comment_data)
 
+        data['raw'] = raw_message
         return data
 
     @staticmethod
@@ -538,6 +539,7 @@ class ServerParser:
         else:
             data = ServerParser.parse_beacon(raw_message)
 
+        data['raw'] = raw_message
         return data
 
     @staticmethod
