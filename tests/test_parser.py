@@ -74,6 +74,12 @@ class TestParserBase:
 
         Callsign.parse_message.assert_called_once_with(msg)
 
+    def test_call_failed(self, mocker):
+        with mocker.patch('ogn_lib.parser.Parser.parse_message',
+                          side_effect=ValueError):
+            with pytest.raises(exceptions.ParseError):
+                parser.ParserBase.__call__('FLR123456>APRS,')
+
 
 class TestParser:
     def test_parse_msg_from(self, mocker):

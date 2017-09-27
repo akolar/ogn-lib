@@ -65,27 +65,36 @@ class ParserBase(type):
             message's callsign was not found
         """
 
-        _, body = raw_message.split('>', 1)
-        destto, *_ = body.split(',', 1)
-
-        if body.startswith('APRS,TCPIP*,qAC'):  # server message
-            return ServerParser.parse_message(raw_message)
-
         try:
-            parser = cls.parsers[destto]
-            logger.debug('Using %s parser for %s', parser, raw_message)
-        except KeyError:
-            logger.warn('Parser for a destto name %s not found; found: %s',
-                        destto, list(cls.parsers.keys()))
+            _, body = raw_message.split('>', 1)
+            destto, *_ = body.split(',', 1)
 
-            if cls.default:
-                parser = cls.default
-            else:
-                raise exceptions.ParserNotFoundError(
-                    'Parser for a destto name {} not found; found: {}'
-                    .format(destto, list(cls.parsers.keys())))
+            if 'TCPIP*' in body or ':>' in body or 'qAC' in body:  # server message
+                return ServerParser.parse_message(raw_message)
 
-        return parser.parse_message(raw_message)
+            try:
+                parser = cls.parsers[destto]
+                logger.debug('Using %s parser for %s', parser, raw_message)
+            except KeyError:
+                logger.warn('Parser for a destto name %s not found; found: %s',
+                            destto, list(cls.parsers.keys()))
+
+                if cls.default:
+                    parser = cls.default
+                else:
+                    raise exceptions.ParserNotFoundError(
+                        'Parser for a destto name {} not found; found: {}'
+                        .format(destto, list(cls.parsers.keys())))
+
+            return parser.parse_message(raw_message)
+
+        except exceptions.ParserNotFoundError:
+            raise
+        except Exception as e:
+            msg = 'Failed to parse message: {}'.format(raw_message)
+            logger.error(msg)
+            logger.exception(e)
+            raise exceptions.ParseError(msg)
 
 
 class Parser(metaclass=ParserBase):
