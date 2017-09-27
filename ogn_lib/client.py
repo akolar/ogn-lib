@@ -148,8 +148,9 @@ class OgnClient:
         :type parser: callable or None
         """
 
-        line = self._sock_file.readline().strip()
+        line = None
         while line != '' and not self._kill:
+            line = self._sock_file.readline().strip()
             logger.debug('Received APRS message: %s', line)
 
             if line.startswith('#'):
@@ -164,8 +165,6 @@ class OgnClient:
                 callback(line)
 
             self._keepalive()
-
-            line = self._sock_file.readline().strip()
 
     def send(self, message):
         """
