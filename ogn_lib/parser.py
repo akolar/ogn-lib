@@ -112,7 +112,10 @@ class Parser(metaclass=ParserBase):
         from_, body = raw_message.split('>', 1)
         header, *comment = body.split(' ', 1)
 
-        data = {'from': from_}
+        data = {
+            'from': from_,
+            'beacon_type': constants.BeaconType.aircraft_beacon
+        }
         data.update(Parser._parse_header(header))
 
         if comment:
@@ -549,7 +552,11 @@ class ServerParser:
 
         from_, header = raw_message.split('>', 1)
 
-        data = {'from': from_}
+        data = {
+            'from': from_,
+            'beacon_type': constants.BeaconType.server_beacon
+        }
+
         data.update(Parser._parse_header(header))
 
         return data
@@ -571,7 +578,11 @@ class ServerParser:
         origin = header[:sep_idx]
         timestamp = header[sep_idx + 2:]
 
-        data = {'from': from_}
+        data = {
+            'from': from_,
+            'beacon_type': constants.BeaconType.server_status
+        }
+
         data.update(Parser._parse_origin(origin))
         data['timestamp'] = Parser._parse_timestamp(timestamp[:-1])
         data['comment'] = comment
