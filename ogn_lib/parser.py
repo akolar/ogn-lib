@@ -576,7 +576,7 @@ class ServerParser:
         :rtype: dict
         """
 
-        if raw_message.find('CPU') >= 0:
+        if 'CPU' in raw_message or ':>' in raw_message:
             data = ServerParser.parse_status(raw_message)
         else:
             data = ServerParser.parse_beacon(raw_message)
