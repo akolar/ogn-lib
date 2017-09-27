@@ -80,6 +80,7 @@ class TestParser:
         with mocker.patch('ogn_lib.parser.Parser._parse_header', return_value={}):
             data = parser.Parser.parse_message('FROM12345>payload')
             assert data['from'] == 'FROM12345'
+            assert data['beacon_type'] is constants.BeaconType.aircraft_beacon
 
     def test_parse_msg(self, mocker):
         with mocker.patch('ogn_lib.parser.Parser._parse_header',
@@ -400,6 +401,7 @@ class TestServerParser:
                 'A=001689')
 
         assert data['from']
+        assert data['beacon_type'] is constants.BeaconType.server_beacon
 
     def test_parse_status(self, mocker):
         msg = (
@@ -419,4 +421,5 @@ class TestServerParser:
                     'APRS,TCPIP*,qAC,GLIDERN2')
 
         assert data['timestamp'] == 'ts'
+        assert data['beacon_type'] is constants.BeaconType.server_status
         assert 'origin' in data

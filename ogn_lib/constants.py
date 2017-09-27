@@ -25,3 +25,9 @@ class AddressType(enum.Enum):
     flarm = 0b010
     ogn_tracker = 0b011
     naviter = 0b100
+
+
+class BeaconType(enum.Enum):
+    aircraft_beacon = 1
+    server_beacon = 2
+    server_status = 3
