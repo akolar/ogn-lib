@@ -595,13 +595,16 @@ class ServerParser:
         """
 
         from_, header = raw_message.split('>', 1)
+        position, *comment = header.split(' ', 1)
 
         data = {
             'from': from_,
             'beacon_type': constants.BeaconType.server_beacon
         }
 
-        data.update(Parser._parse_header(header))
+        data.update(Parser._parse_header(position))
+
+        data['comment'] = comment[0] if comment else None
 
         return data
 

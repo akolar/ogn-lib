@@ -424,6 +424,15 @@ class TestServerParser:
 
         assert data['from']
         assert data['beacon_type'] is constants.BeaconType.server_beacon
+        assert data['comment'] is None
+
+    def test_parse_beacon_comment(self, mocker):
+        with mocker.patch('ogn_lib.parser.Parser._parse_header', return_value={}):
+            msg = ('LKHS>APRS,TCPIP*,qAC,GLIDERN2:/211635h4902.45NI01429.51E&'
+                   '000/000/A=001689 comment')
+            data = parser.ServerParser.parse_beacon(msg)
+
+        assert data['comment'] == 'comment'
 
     def test_parse_status(self, mocker):
         msg = (
