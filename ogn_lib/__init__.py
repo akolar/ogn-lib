@@ -3,7 +3,7 @@ from ogn_lib.parser import Parser  # noqa: F401
 
 __title__ = 'ogn-lib'
 __description__ = 'Beacon processor for the OGN data stream.'
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 __author__ = 'Anze Kolar'
 __author_email__ = 'me@akolar.com'
 __license__ = 'MIT'
