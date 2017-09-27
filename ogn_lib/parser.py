@@ -394,7 +394,7 @@ class APRS(Parser):
     Parser for the orignal OGN-flavoured APRS messages.
     """
 
-    __destto__ = 'APRS'
+    __destto__ = ['APRS', 'OGFLR', 'OGNTRK']
 
     FLAGS_STEALTH = 1 << 7
     FLAGS_DO_NOT_TRACK = 1 << 6
