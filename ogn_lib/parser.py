@@ -145,7 +145,9 @@ class Parser(metaclass=ParserBase):
         :rtype: dict
         """
 
-        origin, position = header.split(':/', 1)
+        col_idx = header.find(':')
+        origin = header[:col_idx]
+        position = header[col_idx + 2:]
 
         data = Parser._parse_origin(origin)
         data.update(Parser._parse_position(position))
@@ -405,9 +407,10 @@ class APRS(Parser):
             elif field.endswith('kHz'):  # frequency offset
                 data['frequency_offset'] = float(field[:-3])
             elif field.startswith('gps'):  # (optional) gps quality
+                x_idx = field.find('x')
                 data['gps_quality'] = {
-                    'vertical': int(field[5]),
-                    'horizontal': int(field[3])
+                    'vertical': int(field[x_idx + 1:]),
+                    'horizontal': int(field[3:x_idx])
                 }
             elif field.startswith('s'):  # (optional) flarm software version
                 data['flarm_software'] = field[1:]
