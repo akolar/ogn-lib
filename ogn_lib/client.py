@@ -72,7 +72,7 @@ class OgnClient:
 
         self._socket = socket.create_connection((self.server, self.port))
 
-        self._sock_file = self._socket.makefile()
+        self._sock_file = self._socket.makefile('rw')
         conn_response = self._sock_file.readline().strip()
         logger.debug('Connection response: %s', conn_response)
 
