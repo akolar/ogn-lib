@@ -95,13 +95,31 @@ class TestClient:
     def test_receive_reconnect(self, mocker):
         sock = self._get_mocked_socket(mocker, True)
         with mocker.patch('socket.create_connection', return_value=sock):
-            cl = client.OgnClient('username')
-            cl._receive_loop = mocker.MagicMock(side_effect=BrokenPipeError)
-            cl.connect()
-            cl.connect = mocker.MagicMock(side_effect=lambda: cl.disconnect())
-            cl.receive(lambda x: None)
+            with mocker.patch('time.sleep') as m_time:
+                cl = client.OgnClient('username')
+                cl._receive_loop = mocker.MagicMock(side_effect=BrokenPipeError)
+                cl.connect()
+                cl.connect = mocker.MagicMock(side_effect=lambda: cl.disconnect())
+                cl.receive(lambda x: None)
+
+                m_time.call_count == 0
 
         assert cl.connect.call_count > 0
+
+    def test_receive_reconnect_fail(self, mocker):
+        sock = self._get_mocked_socket(mocker, True)
+        with mocker.patch('socket.create_connection', return_value=sock):
+            with mocker.patch('time.sleep') as m_time:
+                cl = client.OgnClient('username')
+                cl._receive_loop = mocker.MagicMock(side_effect=BrokenPipeError)
+                cl.connect()
+                cl.connect = mocker.MagicMock(side_effect=BrokenPipeError)
+                with pytest.raises(ConnectionError):
+                    cl.receive(lambda x: None)
+
+                m_time.call_count == cl._connection_retries
+
+        assert cl.connect.call_count == cl._connection_retries
 
     def test_receive_loop_exit(self, mocker):
         sock = self._get_mocked_socket(mocker, True)

@@ -56,6 +56,7 @@ class OgnClient:
         self._authenticated = False
         self._kill = False
         self._last_send = -1
+        self._connection_retries = 50
 
     def connect(self):
         """
@@ -71,8 +72,9 @@ class OgnClient:
                     self.filter_ if self.filter_ else 'not set')
 
         self._socket = socket.create_connection((self.server, self.port))
+        self._socket.settimeout(15)
 
-        self._sock_file = self._socket.makefile('rw')
+        self._sock_file = self._socket.makefile()
         conn_response = self._sock_file.readline().strip()
         logger.debug('Connection response: %s', conn_response)
 
@@ -126,15 +128,27 @@ class OgnClient:
         while not self._kill:
             try:
                 self._receive_loop(callback, parser)
-            except (BrokenPipeError, ConnectionResetError, socket.error) as e:
+            except (BrokenPipeError, ConnectionResetError, socket.error,
+                    socket.timeout) as e:
                 logger.error('Socket connection dropped')
                 logger.exception(e)
 
             if self._kill or not reconnect:
                 logger.info('Exiting OgnClient.receive()')
-                break
+                return
 
-            self.connect()
+            i = 0
+            while i < self._connection_retries:
+                try:
+                    self.connect()
+                    break
+                except (BrokenPipeError, ConnectionResetError, socket.error,
+                        socket.timeout) as e:
+                    logger.exception(e)
+                    i += 1
+                    time.sleep(15)
+            else:
+                raise ConnectionError
 
     def _receive_loop(self, callback, parser):
         """
