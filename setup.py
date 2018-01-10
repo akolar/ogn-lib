@@ -15,7 +15,7 @@ tests_require = [
 
 
 setup(
-    name='OGN lib',
+    name='ogn-lib',
     version=ogn_lib.__version__,
     description=ogn_lib.__description__,
     long_description=long_description(),
