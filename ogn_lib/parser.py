@@ -686,3 +686,31 @@ class Spider(Parser):
             'spider_id': fields[2],
             'gps_status': fields[3]
         }
+
+
+class Skylines(Parser):
+    """
+    Parser for Spider-formatted APRS messages.
+    """
+
+    __destto__ = ['OGSKYL', 'OGSKYL-1']
+
+    @staticmethod
+    def _parse_protocol_specific(comment):
+        """
+        Parses the comment string from Spider's APRS messages.
+        :param str comment: comment string
+        :return: parsed comment
+        :rtype: dict
+        """
+
+        fields = comment.split(' ', maxsplit=1)
+
+        if len(fields) < 2:
+            raise exceptions.ParseError('Skylines comment incorrectly formatted:'
+                                        ' received {}'.format(comment))
+
+        return {
+            'id': fields[0],
+            'vertical_speed': int(fields[1][:3]) * FEET_TO_METERS
+        }
