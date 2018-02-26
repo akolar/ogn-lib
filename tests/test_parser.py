@@ -481,6 +481,23 @@ class TestSkylines:
             parser.Skylines._parse_protocol_specific('id1111')
 
 
+class TestLT24:
+    def test_parse_protocol_specific(self):
+        data = parser.LiveTrack24._parse_protocol_specific('id25387 +000fpm GPS')
+        assert data['id'] == 'id25387'
+        assert data['vertical_speed'] == 0
+        assert data['source'] == 'GPS'
+
+        data = parser.LiveTrack24._parse_protocol_specific('id25387 +159fpm GPS')
+        assert data['id'] == 'id25387'
+        assert abs(data['vertical_speed'] - 4.57) < 0.1
+        assert data['source'] == 'GPS'
+
+    def test_parse_protocol_specific_fail(self):
+        with pytest.raises(exceptions.ParseError):
+            parser.LiveTrack24._parse_protocol_specific('id11111 GPS')
+
+
 class TestServerParser:
 
     def test_parse_message_beacon(self, mocker):
