@@ -627,3 +627,33 @@ class ServerParser(Parser):
         """
 
         return {'comment': comment}
+
+
+class Spot(Parser):
+    """
+    Parser for Spot-formatted APRS messages.
+    """
+
+    __destto__ = ['OGSPOT', 'OGSPOT-1']
+
+    @staticmethod
+    def _parse_protocol_specific(comment):
+        """
+        Parses the comment string from Spot's APRS messages.
+
+        :param str comment: comment string
+        :return: parsed comment
+        :rtype: dict
+        """
+
+        fields = comment.split(' ', maxsplit=2)
+
+        if len(fields) < 3:
+            raise exceptions.ParseError('SPOT comment incorrectly formatted: '
+                                        'received {}'.format(comment))
+
+        return {
+            'id': fields[0],
+            'model': fields[1],
+            'status': fields[2]
+        }

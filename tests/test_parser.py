@@ -440,6 +440,18 @@ class TestNaviter:
         assert data['address_type'] is constants.AddressType.naviter
 
 
+class TestSpot:
+    def test_parse_protocol_specific(self):
+        data = parser.Spot._parse_protocol_specific('id0-2860357 SPOT3 GOOD')
+        assert data['id'] == 'id0-2860357'
+        assert data['model'] == 'SPOT3'
+        assert data['status'] == 'GOOD'
+
+    def test_parse_protocol_specific_fail(self):
+        with pytest.raises(exceptions.ParseError):
+            parser.Spot._parse_protocol_specific('id0-2860357 SPOT3')
+
+
 class TestServerParser:
 
     def test_parse_message_beacon(self, mocker):
