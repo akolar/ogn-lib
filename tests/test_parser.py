@@ -518,6 +518,19 @@ class TestLT24:
             parser.LiveTrack24._parse_protocol_specific('id11111 GPS')
 
 
+class TestCapturs:
+    def test_process(self):
+        parser.Capturs.parse_message(
+            "FLRDDEEF1>OGCAPT,qAS,CAPTURS:/065144h4837.56N/00233.80E'000/000/")
+
+    def test_preprocess(self):
+        msg_original = ("FLRDDEEF1>OGCAPT,qAS,CAPTURS:/065144h4837.56N/"
+                        "00233.80E'000/000/")
+        msg = parser.Capturs._preprocess_message(msg_original)
+
+        assert msg == msg_original[:-1]
+
+
 class TestServerParser:
 
     def test_parse_message_beacon(self, mocker):

@@ -770,3 +770,11 @@ class LiveTrack24(Parser):
             'vertical_speed': Parser._convert_fpm_to_ms(fields[1]),
             'source': fields[2]
         }
+
+
+class Capturs(Parser):
+    __destto__ = ['OGLT24', 'OGLT24-1']
+
+    @staticmethod
+    def _preprocess_message(message):
+        return message.strip('/')
