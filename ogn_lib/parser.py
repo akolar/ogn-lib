@@ -714,3 +714,32 @@ class Skylines(Parser):
             'id': fields[0],
             'vertical_speed': int(fields[1][:3]) * FEET_TO_METERS
         }
+
+
+class LiveTrack24(Parser):
+    """
+    Parser for LiveTrack24-formatted APRS messages.
+    """
+
+    __destto__ = ['OGLT24', 'OGLT24-1']
+
+    @staticmethod
+    def _parse_protocol_specific(comment):
+        """
+        Parses the comment string from LiveTrack24's APRS messages.
+        :param str comment: comment string
+        :return: parsed comment
+        :rtype: dict
+        """
+
+        fields = comment.split(' ', maxsplit=2)
+
+        if len(fields) < 3:
+            raise exceptions.ParseError('LT24 comment incorrectly formatted:'
+                                        ' received {}'.format(comment))
+
+        return {
+            'id': fields[0],
+            'vertical_speed': int(fields[1][:3]) * FEET_TO_METERS,
+            'source': fields[2]
+        }
