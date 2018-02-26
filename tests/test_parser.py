@@ -177,11 +177,13 @@ class TestParser:
         mocker.spy(parser.Parser, '_parse_digipeaters')
         mocker.spy(parser.Parser, '_parse_heading_speed')
         mocker.spy(parser.Parser, '_parse_protocol_specific')
+        mocker.spy(parser.Parser, '_preprocess_message')
 
-        parser.Parser.parse_message(
-            'FLRDD83BC>APRS,qAS,EDLF:/163148h5124.56N/00634.42E\''
-            '276/075/A=001551')
+        msg = ('FLRDD83BC>APRS,qAS,EDLF:/163148h5124.56N/00634.42E\''
+               '276/075/A=001551')
+        parser.Parser.parse_message(msg)
 
+        parser.Parser._preprocess_message.assert_called_once_with(msg)
         parser.Parser._parse_timestamp.assert_called_once_with('163148h')
         assert parser.Parser._parse_location.call_count == 2
         parser.Parser._parse_altitude.assert_called_once_with('001551')
@@ -231,6 +233,10 @@ class TestParser:
         parser.Parser._parse_protocol_specific.assert_called_once_with('[comment]')
 
         assert data['comment']
+
+    def test_preprocess_message(self):
+        msg = 'asdf'
+        assert parser.Parser._preprocess_message(msg) == msg
 
     def test_parse_digipeaters(self):
         data = parser.Parser._parse_digipeaters('qAS,RECEIVER')
