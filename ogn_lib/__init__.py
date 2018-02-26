@@ -4,7 +4,7 @@ from ogn_lib.constants import AirplaneType, AddressType, BeaconType  # noqa: F40
 
 __title__ = 'ogn-lib'
 __description__ = 'Beacon processor for the OGN data stream.'
-__version__ = '0.1.3'
+__version__ = '0.2.0'
 __author__ = 'Anze Kolar'
 __author_email__ = 'me@akolar.com'
 __license__ = 'MIT'
