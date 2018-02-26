@@ -466,6 +466,21 @@ class TestSpider:
             parser.Spider._parse_protocol_specific('id300234010617040 +19dB')
 
 
+class TestSkylines:
+    def test_parse_protocol_specific(self):
+        data = parser.Skylines._parse_protocol_specific('id2816 +000fpm')
+        assert data['id'] == 'id2816'
+        assert data['vertical_speed'] == 0
+
+        data = parser.Skylines._parse_protocol_specific('id2816 +159fpm')
+        assert data['id'] == 'id2816'
+        assert abs(data['vertical_speed'] - 4.57) < 0.1
+
+    def test_parse_protocol_specific_fail(self):
+        with pytest.raises(exceptions.ParseError):
+            parser.Skylines._parse_protocol_specific('id1111')
+
+
 class TestServerParser:
 
     def test_parse_message_beacon(self, mocker):
