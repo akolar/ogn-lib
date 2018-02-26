@@ -1,6 +1,7 @@
 import collections
 import functools
 import logging
+import re
 from datetime import datetime, time, timedelta
 
 from ogn_lib import constants, exceptions
@@ -43,6 +44,8 @@ class ParserBase(type):
             for c in callsigns:
                 logger.debug('Setting %s as a parser for %s messages', name, c)
                 meta.parsers[c] = class_
+        elif callsigns is None:
+            pass
         else:
             raise TypeError('instance of __destto__ should be either a sequence'
                             'or a string; is {}'.format(type(callsigns)))
@@ -69,7 +72,7 @@ class ParserBase(type):
             _, body = raw_message.split('>', 1)
             destto, *_ = body.split(',', 1)
 
-            if 'TCPIP*' in body or ':>' in body or 'qAC' in body:  # server message
+            if 'TCPIP*' in body:
                 return ServerParser.parse_message(raw_message)
 
             try:
@@ -102,33 +105,75 @@ class Parser(metaclass=ParserBase):
     Base class for all parser classes.
 
     Implements parsing of APRS message header and calls the populates the data
-    with the values returned by the _parse_comment(comment) of the extending
-    class.
+    with the values returned by the _parse_protocol_specific(comment) of the
+    extending class.
     """
 
     __default__ = True
 
+    # TNC-2 formatted header (p. 84)
+    PATTERN_HEADER = re.compile('(?P<source>.{1,9})'
+                                '>(?P<destination>.{1,9}?)'
+                                '(,(?P<digipeaters>.{0,80}))'
+                                ':(?P<data>.*?)$')
+
+    # Lat/Long Position Report Format - with Timestamp (p. 32)
+    PATTERN_LOCATION = re.compile('(@|/)'
+                                  '(?P<time>\d{6}(z|h))'
+                                  '(?P<latitude>\d{4}\.\d{2}(N|S))'
+                                  '(/|\\\\|I)(?P<longitude>\d{5}\.\d{2}(E|W))')
+
+    PATTERN_COMMENT_COMON = re.compile('((?P<heading>\d{3})/(?P<speed>\d{3}))?'
+                                       '(/A=(?P<altitude>\d{6}))?'
+                                       '( (?P<protocol_specific>.*?))?$')
+
+    # Merged header and position
+    PATTERN_ALL = re.compile('(?P<source>.{1,9})>'
+                             '(?P<destination>.{1,9}?)'
+                             '(,(?P<digipeaters>.{0,81})):'
+                             '(@|/)'
+                             '(?P<time>\d{6}(z|h))'
+                             '(?P<latitude>\d{4}\.\d{2}(N|S))'
+                             '.(?P<longitude>\d{5}\.\d{2}(E|W))'
+                             '.((?P<heading>\d{3})/(?P<speed>\d{3}))?'
+                             '(/A=(?P<altitude>\d{6}))?'
+                             '( (?P<protocol_specific>.*?))?$')
+
     @classmethod
     def parse_message(cls, raw_message):
         """
-        Parses the fields of a raw APRS message to a dictionary.
+        Parses the fields of a raw APRS message to a dictionary. Returns
+        none if message could not be parsed.
 
         :param str raw_message: raw APRS message
-        :return: parsed message
-        :rtype: dict
+        :return: parsed message or None if the message failed to parse
+        :rtype: dict or None
+        :raises ogn_lib.exceptions.ParseError: if message cannot be parsed
+            using Parser.PATTERN_ALL
         """
 
-        from_, body = raw_message.split('>', 1)
-        header, *comment = body.split(' ', 1)
+        match = cls.PATTERN_ALL.match(raw_message)
+
+        if not match:
+            raise exceptions.ParseError('Message {} did not match {}'
+                                        .format(raw_message, cls.PATTERN_ALL))
 
         data = {
-            'from': from_,
-            'beacon_type': constants.BeaconType.aircraft_beacon
+            'from': match.group('source'),
+            'destto': match.group('destination'),
+            'beacon_type': constants.BeaconType.aircraft_beacon,
+            'timestamp': Parser._parse_timestamp(match.group('time')),
+            'latitude': Parser._parse_location(match.group('latitude')),
+            'longitude': Parser._parse_location(match.group('longitude')),
+            'altitude': Parser._parse_altitude(match.group('altitude'))
         }
-        data.update(Parser._parse_header(header))
+        data.update(Parser._parse_digipeaters(match.group('digipeaters')))
+        data.update(Parser._parse_heading_speed(match.group('heading'),
+                                                match.group('speed')))
 
-        if comment:
-            comment_data = cls._parse_comment(comment[0])
+        protocol_specific = match.group('protocol_specific')
+        if protocol_specific:
+            comment_data = cls._parse_protocol_specific(protocol_specific)
 
             try:
                 cls._update_data(data, comment_data['_update'])
@@ -142,105 +187,52 @@ class Parser(metaclass=ParserBase):
         return data
 
     @staticmethod
-    def _parse_header(header):
+    def _parse_digipeaters(digipeaters):
         """
-        Parses the APRS message header.
+        Parses the content of the APRS digipeaters field and extracts the
+        information about the receiver and the relayer.
 
-        :param str header: APRS message between the '[callsign]>' and comment
-                           field
-        :param str pos_separator: separator for latitude and longitude
-        :param str attrs_separator: separator for attributes substring
-        :return: parsed header
+        :param str digipeaters: digipeaters string from the original message
+        :return: dictionary with the receiver and the relayer
         :rtype: dict
+        :raises ValueError: if digipeaters string is in invalid format
         """
 
-        col_idx = header.find(':')
-        origin = header[:col_idx]
-        position = header[col_idx + 2:]
+        fields = digipeaters.split(',')
 
-        data = Parser._parse_origin(origin)
-        data.update(Parser._parse_position(position))
-
-        return data
-
-    @staticmethod
-    def _parse_origin(header):
-        """
-        Parses the destto, receiver and relayer field of the APRS message.
-        :param str header: APRS message between the '[callsign]>' and position
-                           information
-        :return: parsed origin part of the APRS message
-        :rtype: dict
-        """
-
-        fields = header.split(',')
-
-        if len(fields) == 3:  # standard message
+        if len(fields) == 2:  # standard message
             relayer = None
-        elif len(fields) == 4:  # relayed message
-            relayer = fields[1].strip('*')
+        elif len(fields) == 3:  # relayed message
+            relayer = fields[0].strip('*')
         else:
-            raise ValueError('Unknown header format: {}'.format(header))
+            raise ValueError('Unknown digipeaters format: {}'
+                             .format(digipeaters))
 
-        data = {'destto': fields[0], 'receiver': fields[-1], 'relayer': relayer}
-
-        return data
+        return {'receiver': fields[-1], 'relayer': relayer}
 
     @staticmethod
-    def _parse_position(pos_header):
+    def _parse_heading_speed(heading, speed):
         """
-        Parses the position information, timestamp, altitude, heading and
-        ground speed from an APRS message.
+        Parses and converts the heading and speed from the original message
+        to the appropriate units.
 
-        :param str pos_header: position part of the APRS header
-        :param str pos_separator: separator for latitude and longitude
-        :param str attrs_separator: separator for attributes substring
-        :return: parsed position part of the APRS message
+        :param str heading: heading string
+        :param str speed: speed string
+        :return: dictionary containing the heading and ground speed in m/s
         :rtype: dict
         """
 
-        timestamp = pos_header[0:7]
-        lat = pos_header[7:15]
-        lon = pos_header[16:25]
-        attrs = pos_header[26:]
+        if not heading or not speed:
+            return {}
 
-        data = {
-            'timestamp': Parser._parse_timestamp(timestamp),
-            'latitude': Parser._parse_location(lat),
-            'longitude': Parser._parse_location(lon),
-        }
-        data.update(Parser._parse_attributes(attrs))
+        hdg = int(heading)
+        gsp = int(speed)
 
-        return data
-
-    @staticmethod
-    def _parse_attributes(attributes):
-        """
-        Parses the APRS attributes for heading, ground speed and altitude.
-
-        :param str attributes: attributes part of the APRS message
-        :return: parsed attributes
-        :rtype: dict
-        """
-
-        attrs = attributes.split('/')
         data = {}
 
-        if attrs[-1].startswith('A='):  # has altitude
-            data['altitude'] = int(attrs[-1][2:]) * FEET_TO_METERS
-        else:
-            data['altitude'] = None
-
-        if len(attrs) > 1 and attributes[0] != '/':  # i.e., format is hdg/gsp/?
-            heading = int(attrs[0])
-            speed = int(attrs[1])
-        else:
-            heading = None
-            speed = None
-
-        if heading or speed:
-            data['heading'] = heading
-            data['ground_speed'] = speed * KNOTS_TO_MS
+        if hdg or gsp:
+            data['heading'] = hdg
+            data['ground_speed'] = gsp * KNOTS_TO_MS
         else:
             data['heading'] = None
             data['ground_speed'] = None
@@ -248,11 +240,24 @@ class Parser(metaclass=ParserBase):
         return data
 
     @staticmethod
+    def _parse_altitude(altitude_string):
+        """
+        Parses the altitude string and converts it from feet to meters.
+
+        :param altitude_string: the altitude string
+        :type altitude_string: str or None
+        :return: altitude in meters or None if altitude_str is not given
+        :rtype: float or None
+        """
+
+        return int(altitude_string) * FEET_TO_METERS if altitude_string else None
+
+    @staticmethod
     def _parse_timestamp(timestamp_str):
         """
-        Parses the UTC timestamp of an APRS package.
+        Parses the timestamp of an APRS package.
 
-        :param timestamp_str: utc timestamp string in %H%M%S or %d%H%M format
+        :param str timestamp_str: timestamp string in %H%M%S or %d%H%M format
         :return: parsed timestamp
         :rtype: datetime.datetime
         """
@@ -318,6 +323,9 @@ class Parser(metaclass=ParserBase):
         :rtype: float
         """
 
+        if not location_str:
+            return None
+
         sphere = location_str[-1]
         offset = 2 if sphere in ('N', 'S') else 3
 
@@ -330,7 +338,7 @@ class Parser(metaclass=ParserBase):
         return location
 
     @staticmethod
-    def _parse_comment(comment):
+    def _parse_protocol_specific(comment):
         """
         Parses the comment string from APRS messages.
 
@@ -339,7 +347,7 @@ class Parser(metaclass=ParserBase):
         :rtype: dict
         """
 
-        logger.warn('Parser._parse_comment method not overriden')
+        logger.warn('Parser._parse_protocol_specific method not overriden')
         return {}
 
     @staticmethod
@@ -411,7 +419,7 @@ class APRS(Parser):
     FLAGS_ADDRESS_TYPE = 0b11
 
     @staticmethod
-    def _parse_comment(comment):
+    def _parse_protocol_specific(comment):
         """
         Parses the comment string from APRS messages.
 
@@ -510,7 +518,7 @@ class Naviter(Parser):
     FLAGS_ADDRESS_TYPE = 0b111111 << 4
 
     @staticmethod
-    def _parse_comment(comment):
+    def _parse_protocol_specific(comment):
         """
         Parses the comment string from Naviter's APRS messages.
 
@@ -570,77 +578,52 @@ class Naviter(Parser):
         }
 
 
-class ServerParser:
+class ServerParser(Parser):
     """
     Parser for server messages.
     """
 
-    @staticmethod
-    def parse_message(raw_message):
-        """
-        Passes a server message to an appropriate parser.
+    __destto__ = None
 
-        :param raw_message: APRS message
-        :return: parsed data
+    PATTERN_ALL = re.compile('(?P<source>.{1,9})>'
+                             '(?P<destination>.{1,9}?)'
+                             '(,(?P<digipeaters>.{0,81})):'
+                             '(@|/|>)'
+                             '(?P<time>\d{6}(z|h))'
+                             '((?P<latitude>\d{4}\.\d{2}(N|S))'
+                             '.(?P<longitude>\d{5}\.\d{2}(E|W)))?'
+                             '(.((?P<heading>\d{3})/(?P<speed>\d{3}))?'
+                             '(/A=(?P<altitude>\d{6}))?)?'
+                             '( (?P<protocol_specific>.*?))?$')
+
+    @classmethod
+    def parse_message(cls, raw_message):
+        """
+        Parses the server message using the Parser.parse_message.
+
+        :param str raw_message: raw APRS message
+        :return: parsed message
         :rtype: dict
         """
 
-        if 'CPU' in raw_message or ':>' in raw_message:
-            data = ServerParser.parse_status(raw_message)
+        data = super().parse_message(raw_message)
+
+        if 'comment' in data:
+            data['beacon_type'] = constants.BeaconType.server_status
         else:
-            data = ServerParser.parse_beacon(raw_message)
-
-        data['raw'] = raw_message
-        return data
-
-    @staticmethod
-    def parse_beacon(raw_message):
-        """
-        Parses server beacon messages.
-
-        :param raw_message: APRS message
-        :return: parsed data
-        :rtype: dict
-        """
-
-        from_, header = raw_message.split('>', 1)
-        position, *comment = header.split(' ', 1)
-
-        data = {
-            'from': from_,
-            'beacon_type': constants.BeaconType.server_beacon
-        }
-
-        data.update(Parser._parse_header(position))
-
-        data['comment'] = comment[0] if comment else None
+            data['beacon_type'] = constants.BeaconType.server_beacon
 
         return data
 
     @staticmethod
-    def parse_status(raw_message):
+    def _parse_protocol_specific(comment):
         """
-        Parses server status messages.
+        Converts the comment field from the server status message to a format
+        expected by Parser.parse_message
 
-        :param raw_message: APRS message
-        :return: parsed data
+        :param str comment: status comment
+        :return: dictionary with the comment
         :rtype: dict
         """
 
-        from_, body = raw_message.split('>', 1)
-        header, comment = body.split(' ', 1)
-
-        sep_idx = header.find(':')
-        origin = header[:sep_idx]
-        timestamp = header[sep_idx + 2:sep_idx + 9]
-
-        data = {
-            'from': from_,
-            'beacon_type': constants.BeaconType.server_status
-        }
-
-        data.update(Parser._parse_origin(origin))
-        data['timestamp'] = Parser._parse_timestamp(timestamp)
-        data['comment'] = comment
-
-        return data
+        return {'comment': comment}
