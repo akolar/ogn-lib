@@ -640,7 +640,6 @@ class Spot(Parser):
     def _parse_protocol_specific(comment):
         """
         Parses the comment string from Spot's APRS messages.
-
         :param str comment: comment string
         :return: parsed comment
         :rtype: dict
@@ -656,4 +655,34 @@ class Spot(Parser):
             'id': fields[0],
             'model': fields[1],
             'status': fields[2]
+        }
+
+
+class Spider(Parser):
+    """
+    Parser for Spider-formatted APRS messages.
+    """
+
+    __destto__ = ['OGSPID', 'OGSPID-1']
+
+    @staticmethod
+    def _parse_protocol_specific(comment):
+        """
+        Parses the comment string from Spider's APRS messages.
+        :param str comment: comment string
+        :return: parsed comment
+        :rtype: dict
+        """
+
+        fields = comment.split(' ', maxsplit=3)
+
+        if len(fields) < 4:
+            raise exceptions.ParseError('Spider comment incorrectly formatted:'
+                                        ' received {}'.format(comment))
+
+        return {
+            'id': fields[0],
+            'signal_strength': fields[1],
+            'spider_id': fields[2],
+            'gps_status': fields[3]
         }
