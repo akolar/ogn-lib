@@ -153,6 +153,8 @@ class Parser(metaclass=ParserBase):
             using Parser.PATTERN_ALL
         """
 
+        raw_message = cls._preprocess_message(raw_message)
+
         match = cls.PATTERN_ALL.match(raw_message)
 
         if not match:
@@ -186,6 +188,18 @@ class Parser(metaclass=ParserBase):
 
         data['raw'] = raw_message
         return data
+
+    @staticmethod
+    def _preprocess_message(message):
+        """
+        Performs additional preprocessing on the received APRS message.
+
+        :param str message: the received message
+        :return: processed message
+        :rtype: str
+        """
+
+        return message
 
     @staticmethod
     def _parse_digipeaters(digipeaters):
@@ -756,3 +770,11 @@ class LiveTrack24(Parser):
             'vertical_speed': Parser._convert_fpm_to_ms(fields[1]),
             'source': fields[2]
         }
+
+
+class Capturs(Parser):
+    __destto__ = ['OGLT24', 'OGLT24-1']
+
+    @staticmethod
+    def _preprocess_message(message):
+        return message.strip('/')
