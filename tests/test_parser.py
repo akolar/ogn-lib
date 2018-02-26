@@ -323,6 +323,14 @@ class TestParser:
     def test_parse_protocol_specific(self):
         assert parser.Parser._parse_protocol_specific("1 2 3 4") == {}
 
+    def test_conv_fpm_to_ms(self):
+        assert abs(parser.Parser._convert_fpm_to_ms('+123fpm') - 0.624) < 0.01
+        assert abs(abs(parser.Parser._convert_fpm_to_ms('-123fpm')) - 0.624) < 0.01
+
+    def test_conv_fpm_to_ms_sign(self):
+        assert parser.Parser._convert_fpm_to_ms('+123fpm') > 0
+        assert parser.Parser._convert_fpm_to_ms('-123fpm') < 0
+
     def test_get_location_update_func(self):
         fn = parser.Parser._get_location_update_func(0)
         assert 1 == fn(1)
@@ -379,6 +387,10 @@ class TestAPRS:
         assert (set(map(lambda x: x['target'], data['_update'])) ==
                 {'latitude', 'longitude'})
         del data['_update']
+
+        assert abs(data['vertical_speed'] - 0.1016) < 0.01
+        del data['vertical_speed']
+
         assert data == {
             'address_type': constants.AddressType.flarm,
             'aircraft_type': constants.AirplaneType.glider,
@@ -396,7 +408,6 @@ class TestAPRS:
             'stealth': False,
             'turn_rate': 0.0,
             'uid': '06DF0A52',
-            'vertical_speed': 6.096
         }
 
     def test_parse_id_string(self):
@@ -419,6 +430,10 @@ class TestNaviter:
         assert (set(map(lambda x: x['target'], data['_update'])) ==
                 {'latitude', 'longitude'})
         del data['_update']
+
+        assert abs(data['vertical_speed'] - 0.9144) < 0.01
+        del data['vertical_speed']
+
         assert data == {
             'address_type': constants.AddressType.naviter,
             'aircraft_type': constants.AirplaneType.paraglider,
@@ -426,7 +441,6 @@ class TestNaviter:
             'stealth': False,
             'turn_rate': 0.0,
             'uid': '1C4007220E',
-            'vertical_speed': 54.864000000000004
         }
 
     def test_parse_id_string(self):
@@ -474,7 +488,7 @@ class TestSkylines:
 
         data = parser.Skylines._parse_protocol_specific('id2816 +159fpm')
         assert data['id'] == 'id2816'
-        assert abs(data['vertical_speed'] - 4.57) < 0.1
+        assert abs(data['vertical_speed'] - 0.807) < 0.1
 
     def test_parse_protocol_specific_fail(self):
         with pytest.raises(exceptions.ParseError):
@@ -490,7 +504,7 @@ class TestLT24:
 
         data = parser.LiveTrack24._parse_protocol_specific('id25387 +159fpm GPS')
         assert data['id'] == 'id25387'
-        assert abs(data['vertical_speed'] - 4.57) < 0.1
+        assert abs(data['vertical_speed'] - 0.807) < 0.1
         assert data['source'] == 'GPS'
 
     def test_parse_protocol_specific_fail(self):
