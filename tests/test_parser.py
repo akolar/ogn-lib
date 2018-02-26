@@ -440,6 +440,20 @@ class TestNaviter:
         assert data['address_type'] is constants.AddressType.naviter
 
 
+class TestSpot:
+    def test_parse_protocol_specific(self):
+        data = parser.Spider._parse_protocol_specific('id300234010617040 +19dB'
+                                                      ' LWE 3D')
+        assert data['id'] == 'id300234010617040'
+        assert data['signal_strength'] == '+19dB'
+        assert data['spider_id'] == 'LWE'
+        assert data['gps_status'] == '3D'
+
+    def test_parse_protocol_specific_fail(self):
+        with pytest.raises(exceptions.ParseError):
+            parser.Spider._parse_protocol_specific('id300234010617040 +19dB')
+
+
 class TestServerParser:
 
     def test_parse_message_beacon(self, mocker):
