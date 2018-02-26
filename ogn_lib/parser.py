@@ -10,6 +10,7 @@ from ogn_lib import constants, exceptions
 FEET_TO_METERS = 0.3048
 KNOTS_TO_MS = 1852 / 3600  # ratio between nautical knots and m/s
 HPM_TO_DEGS = 180 / 60  # ratio between half turn per minute and degrees per s
+FPM_TO_MS = FEET_TO_METERS / 60
 
 TD_1DAY = timedelta(days=1)
 
@@ -351,6 +352,18 @@ class Parser(metaclass=ParserBase):
         return {}
 
     @staticmethod
+    def _convert_fpm_to_ms(fpm_string):
+        """Parses and converts a vertical speed string from '+123fpm' to a
+        floating point number in m/s.
+
+        :param str fpm_string: vertical speed string
+        :return: vertical speed in m/s
+        :rtype: float
+        """
+
+        return int(fpm_string[:-3]) * FPM_TO_MS
+
+    @staticmethod
     def _get_location_update_func(update_with):
         """
         Builds a partial function for updating location with 3rd additional
@@ -451,7 +464,7 @@ class APRS(Parser):
             elif field.startswith('id'):
                 data.update(APRS._parse_id_string(field[2:]))
             elif field.endswith('fpm'):  # vertical speed
-                data['vertical_speed'] = int(field[:-3]) * FEET_TO_METERS
+                data['vertical_speed'] = Parser._convert_fpm_to_ms(field)
             elif field.endswith('rot'):  # turn rate
                 data['turn_rate'] = float(field[:-3]) * HPM_TO_DEGS
             elif field.startswith('FL'):  # (optional) flight level
@@ -550,7 +563,7 @@ class Naviter(Parser):
             elif field.startswith('id'):
                 data.update(Naviter._parse_id_string(field[2:]))
             elif field.endswith('fpm'):  # vertical speed
-                data['vertical_speed'] = int(field[:-3]) * FEET_TO_METERS
+                data['vertical_speed'] = Parser._convert_fpm_to_ms(field)
             elif field.endswith('rot'):  # turn rate
                 data['turn_rate'] = float(field[:-3]) * HPM_TO_DEGS
 
@@ -712,7 +725,7 @@ class Skylines(Parser):
 
         return {
             'id': fields[0],
-            'vertical_speed': int(fields[1][:3]) * FEET_TO_METERS
+            'vertical_speed': Parser._convert_fpm_to_ms(fields[1])
         }
 
 
@@ -740,6 +753,6 @@ class LiveTrack24(Parser):
 
         return {
             'id': fields[0],
-            'vertical_speed': int(fields[1][:3]) * FEET_TO_METERS,
+            'vertical_speed': Parser._convert_fpm_to_ms(fields[1]),
             'source': fields[2]
         }
