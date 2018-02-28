@@ -773,7 +773,7 @@ class LiveTrack24(Parser):
 
 
 class Capturs(Parser):
-    __destto__ = ['OGLT24', 'OGLT24-1']
+    __destto__ = ['OGCAPT', 'OGCAPT-1']
 
     @staticmethod
     def _preprocess_message(message):
