@@ -426,6 +426,14 @@ class TestAPRS:
         assert data['aircraft_type'] is constants.AirplaneType.glider
         assert data['address_type'] is constants.AddressType.flarm
 
+    def test_registered(self, mocker):
+        mocker.spy(parser.APRS, '_parse_protocol_specific')
+        parser.Parser("FLRDDA5BA>APRS,qAS,LFMX:/165829h4415.41N/00600.03E'342/"
+                      "049/A=005524 id0ADDA5BA -454fpm -1.1rot 8.8dB 0e "
+                      "+51.2kHz gps4x5")
+        parser.APRS._parse_protocol_specific.assert_called_once_with(
+            'id0ADDA5BA -454fpm -1.1rot 8.8dB 0e +51.2kHz gps4x5')
+
 
 class TestNaviter:
 
@@ -459,6 +467,13 @@ class TestNaviter:
         assert data['aircraft_type'] is constants.AirplaneType.paraglider
         assert data['address_type'] is constants.AddressType.naviter
 
+    def test_registered(self, mocker):
+        mocker.spy(parser.Naviter, '_parse_protocol_specific')
+        parser.Parser("NAV04220E>OGNAVI,qAS,NAVITER:/140748h4552.27N/01155.61E"
+                      "'090/012/A=006562 !W81! id044004220E +060fpm +1.2rot")
+        parser.Naviter._parse_protocol_specific.assert_called_once_with(
+            '!W81! id044004220E +060fpm +1.2rot')
+
 
 class TestSpot:
     def test_parse_protocol_specific(self):
@@ -470,6 +485,13 @@ class TestSpot:
     def test_parse_protocol_specific_fail(self):
         with pytest.raises(exceptions.ParseError):
             parser.Spot._parse_protocol_specific('id0-2860357 SPOT3')
+
+    def test_registered(self, mocker):
+        mocker.spy(parser.Spot, '_parse_protocol_specific')
+        parser.Parser("ICA3E7540>OGSPOT,qAS,SPOT:/161427h1448.35S/04610.86W'"
+                      "000/000/A=008677 id0-2860357 SPOT3 GOOD")
+        parser.Spot._parse_protocol_specific.assert_called_once_with(
+            'id0-2860357 SPOT3 GOOD')
 
 
 class TestSpider:
@@ -485,6 +507,13 @@ class TestSpider:
         with pytest.raises(exceptions.ParseError):
             parser.Spider._parse_protocol_specific('id300234010617040 +19dB')
 
+    def test_registered(self, mocker):
+        mocker.spy(parser.Spider, '_parse_protocol_specific')
+        parser.Parser("FLRDDF944>OGSPID,qAS,SPIDER:/190930h3322.78S/07034.60W'"
+                      "000/000/A=002263 id300234010617040 +19dB LWE 3D")
+        parser.Spider._parse_protocol_specific.assert_called_once_with(
+            'id300234010617040 +19dB LWE 3D')
+
 
 class TestSkylines:
     def test_parse_protocol_specific(self):
@@ -499,6 +528,13 @@ class TestSkylines:
     def test_parse_protocol_specific_fail(self):
         with pytest.raises(exceptions.ParseError):
             parser.Skylines._parse_protocol_specific('id1111')
+
+    def test_registered(self, mocker):
+        mocker.spy(parser.Skylines, '_parse_protocol_specific')
+        parser.Parser("FLRDDDD78>OGSKYL,qAS,SKYLINES:/134403h4225.90N/00144.8"
+                      "3E'000/000/A=008438 id2816 +000fpm")
+        parser.Skylines._parse_protocol_specific.assert_called_once_with(
+            'id2816 +000fpm')
 
 
 class TestLT24:
@@ -517,6 +553,13 @@ class TestLT24:
         with pytest.raises(exceptions.ParseError):
             parser.LiveTrack24._parse_protocol_specific('id11111 GPS')
 
+    def test_registered(self, mocker):
+        mocker.spy(parser.LiveTrack24, '_parse_protocol_specific')
+        parser.Parser("FLRDDE48A>OGLT24,qAS,LT24:/102606h4030.47N/00338.38W'"
+                      "000/018/A=002267 id25387 +000fpm GPS")
+        parser.LiveTrack24._parse_protocol_specific.assert_called_once_with(
+            'id25387 +000fpm GPS')
+
 
 class TestCapturs:
     def test_process(self):
@@ -529,6 +572,12 @@ class TestCapturs:
         msg = parser.Capturs._preprocess_message(msg_original)
 
         assert msg == msg_original[:-1]
+
+    def test_registered(self, mocker):
+        mocker.spy(parser.Capturs, '_preprocess_message')
+        msg = ("FLRDDEEF1>OGCAPT,qAS,CAPTURS:/065144h4837.56N/00233.80E'000/000/")
+        parser.Parser(msg)
+        parser.Capturs._preprocess_message.assert_called_once_with(msg)
 
 
 class TestServerParser:
