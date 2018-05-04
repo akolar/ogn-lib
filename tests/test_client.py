@@ -94,32 +94,37 @@ class TestClient:
 
     def test_receive_reconnect(self, mocker):
         sock = self._get_mocked_socket(mocker, True)
-        with mocker.patch('socket.create_connection', return_value=sock):
-            with mocker.patch('time.sleep') as m_time:
-                cl = client.OgnClient('username')
-                cl._receive_loop = mocker.MagicMock(side_effect=BrokenPipeError)
-                cl.connect()
-                cl.connect = mocker.MagicMock(side_effect=lambda: cl.disconnect())
-                cl.receive(lambda x: None)
+        mocker.patch('socket.create_connection', return_value=sock)
+        mocker.patch('time.sleep')
 
-                m_time.call_count == 0
+        cl = client.OgnClient('username')
+        cl._receive_loop = mocker.MagicMock(side_effect=BrokenPipeError)
+        cl._reconnect = mocker.MagicMock(side_effect=ConnectionError)
+        cl.connect()
+        with pytest.raises(ConnectionError):
+            cl.receive(lambda x: None)
 
-        assert cl.connect.call_count > 0
+        assert cl._reconnect.call_count == 1
 
-    def test_receive_reconnect_fail(self, mocker):
-        sock = self._get_mocked_socket(mocker, True)
-        with mocker.patch('socket.create_connection', return_value=sock):
-            with mocker.patch('time.sleep') as m_time:
-                cl = client.OgnClient('username')
-                cl._receive_loop = mocker.MagicMock(side_effect=BrokenPipeError)
-                cl.connect()
-                cl.connect = mocker.MagicMock(side_effect=BrokenPipeError)
-                with pytest.raises(ConnectionError):
-                    cl.receive(lambda x: None)
+    def test_reconnect_success(self, mocker):
+        cl = client.OgnClient('username')
+        cl.connect = mocker.MagicMock()
+        cl._reconnect(retries=10, wait_period=5)
 
-                m_time.call_count == cl._connection_retries
+        assert cl.connect.call_count == 1
 
-        assert cl.connect.call_count == cl._connection_retries
+    def test_reconnect_fail(self, mocker):
+        mocker.patch('time.sleep')
+
+        cl = client.OgnClient('username')
+        cl.connect = mocker.MagicMock(side_effect=BrokenPipeError)
+
+        with pytest.raises(ConnectionError):
+            cl._reconnect(retries=10, wait_period=5)
+
+        assert time.sleep.call_count == 10
+        assert cl.connect.call_count == 10
+        time.sleep.assert_called_with(5)
 
     def test_receive_loop_exit(self, mocker):
         sock = self._get_mocked_socket(mocker, True)
@@ -178,6 +183,12 @@ class TestClient:
         cl._socket = mocker.Mock()
         cl.send('test message')
         assert time.time() - cl._last_send < 0.001
+
+    def test_send_fail(self, mocker):
+        cl = client.OgnClient('username')
+        cl._socket = mocker.Mock()
+        cl.send('\n\ntest\nmessage\n\n\n')
+        cl._socket.sendall.assert_called_once_with(b'test\nmessage\n')
 
     def _setup_keepalive_client(self, mocker, ts):
         cl = client.OgnClient('username')

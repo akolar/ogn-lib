@@ -137,18 +137,33 @@ class OgnClient:
                 logger.info('Exiting OgnClient.receive()')
                 return
 
-            i = 0
-            while i < self._connection_retries:
-                try:
-                    self.connect()
-                    break
-                except (BrokenPipeError, ConnectionResetError, socket.error,
-                        socket.timeout) as e:
-                    logger.exception(e)
-                    i += 1
-                    time.sleep(15)
-            else:
-                raise ConnectionError
+            self._reconnect(retries=self._connection_retries, wait_period=15)
+
+    def _reconnect(self, retries=1, wait_period=15):
+        """
+        Attempts to recover a failed server connection.
+
+        :param int retries: number of times reestablishing connection is
+            attempted
+        :param float wait_period: amount of seconds between two sequential
+            retries
+        """
+
+        logger.info('Trying to reconnect...')
+
+        while retries > 0:
+            try:
+                self.connect()
+                logger.error('Successfully reconnected')
+                break
+            except (BrokenPipeError, ConnectionResetError, socket.error,
+                    socket.timeout) as e:
+                logger.error('Reconnection attempt failed')
+                logger.exception(e)
+                retries -= 1
+                time.sleep(wait_period)
+        else:
+            raise ConnectionError
 
     def _receive_loop(self, callback, parser):
         """
@@ -180,17 +195,25 @@ class OgnClient:
 
             self._keepalive()
 
-    def send(self, message):
+    def send(self, message, retries=0):
         """
         Sends the message to the APRS server.
 
         :param str message: message to be sent
         """
 
-        message_nl = message.strip('\n') + '\n'
-        logger.info('Sending: %s', message_nl)
-        self._socket.sendall(message_nl.encode())
-        self._last_send = time.time()
+        try:
+            message_nl = message.strip('\n') + '\n'
+            logger.info('Sending: %s', message_nl)
+            self._socket.sendall(message_nl.encode())
+            self._last_send = time.time()
+        except (BrokenPipeError, ConnectionResetError, socket.error,
+                socket.timeout):
+            if retries < 3:
+                self._reconnect(retries=3, wait_period=1)
+                self.send(message, retries=retries + 1)
+            else:
+                raise
 
     def _keepalive(self):
         """
