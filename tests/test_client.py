@@ -184,11 +184,33 @@ class TestClient:
         cl.send('test message')
         assert time.time() - cl._last_send < 0.001
 
-    def test_send_fail(self, mocker):
+    def test_send_fail_once(self, mocker):
+        sock = self._get_mocked_socket(mocker, True)
+        mocker.patch('socket.create_connection', return_value=sock)
+
         cl = client.OgnClient('username')
         cl._socket = mocker.Mock()
+        cl._socket.sendall = mocker.Mock(side_effect=[BrokenPipeError, None])
+        cl._reconnect = mocker.Mock()
         cl.send('\n\ntest\nmessage\n\n\n')
-        cl._socket.sendall.assert_called_once_with(b'test\nmessage\n')
+
+        assert cl._socket.sendall.call_count == 2
+        assert cl._reconnect.call_count == 1
+
+    def test_send_fail_full(self, mocker):
+        sock = self._get_mocked_socket(mocker, True)
+        mocker.patch('socket.create_connection', return_value=sock)
+
+        cl = client.OgnClient('username')
+        cl._socket = mocker.Mock()
+        cl._socket.sendall = mocker.Mock(side_effect=BrokenPipeError)
+        cl._reconnect = mocker.Mock()
+
+        with pytest.raises(BrokenPipeError):
+            cl.send('\n\ntest\nmessage\n\n\n')
+
+        assert cl._socket.sendall.call_count == 4
+        assert cl._reconnect.call_count == 3
 
     def _setup_keepalive_client(self, mocker, ts):
         cl = client.OgnClient('username')
