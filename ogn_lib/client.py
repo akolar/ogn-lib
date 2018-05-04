@@ -195,7 +195,7 @@ class OgnClient:
 
             self._keepalive()
 
-    def send(self, message, retries=0):
+    def send(self, message, retries=0, wait_period=0):
         """
         Sends the message to the APRS server.
 
@@ -210,7 +210,7 @@ class OgnClient:
         except (BrokenPipeError, ConnectionResetError, socket.error,
                 socket.timeout):
             if retries < 3:
-                self._reconnect(retries=3, wait_period=1)
+                self._reconnect(retries=3, wait_period=wait_period)
                 self.send(message, retries=retries + 1)
             else:
                 raise
