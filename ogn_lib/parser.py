@@ -778,3 +778,44 @@ class Capturs(Parser):
     @staticmethod
     def _preprocess_message(message):
         return message.strip('/')
+
+
+class Fanet(Parser):
+    """
+    Parser for Fanet-formatted APRS messages.
+    """
+
+    __destto__ = ['OGNFNT', 'OGNFNT-1']
+
+    @staticmethod
+    def _parse_protocol_specific(comment):
+        """
+        Parses the comment string from Fanet's APRS messages.
+        :param str comment: comment string
+        :return: parsed comment
+        :rtype: dict
+        """
+
+        fields = comment.split(' ')
+
+        if len(fields) != 3:
+            raise exceptions.ParseError('Fanet comment incorrectly formatted:'
+                                        ' received {}'.format(comment))
+
+        lat_dig = int(fields[0][2])
+        lon_dig = int(fields[0][3])
+        update_position = [
+            {
+                'target': 'latitude',
+                'function': Parser._get_location_update_func(lat_dig)
+            }, {
+                'target': 'longitude',
+                'function': Parser._get_location_update_func(lon_dig)
+            }
+        ]
+
+        return {
+            '_update': update_position,
+            'id': fields[1],
+            'vertical_speed': Parser._convert_fpm_to_ms(fields[2])
+        }

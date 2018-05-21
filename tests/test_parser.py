@@ -580,6 +580,32 @@ class TestCapturs:
         parser.Capturs._preprocess_message.assert_called_once_with(msg)
 
 
+class TestFanet:
+
+    def test_parse_protocol_specific(self):
+        data = parser.Fanet._parse_protocol_specific('!W30! id1E1103CE 180fpm')
+
+        assert data['id'] == 'id1E1103CE'
+        assert abs(data['vertical_speed'] - 0.9144) < 0.01
+        assert (list(map(lambda x: x['target'], data['_update'])) ==
+                ['latitude', 'longitude'])
+
+    def test_parse_protocol_specific_fail(self):
+        with pytest.raises(exceptions.ParseError):
+            parser.Fanet._parse_protocol_specific('id1E1103CE')
+
+        with pytest.raises(exceptions.ParseError):
+            parser.Fanet._parse_protocol_specific(
+                '!W30! id1E1103CE -02fpm x')
+
+    def test_registered(self, mocker):
+        mocker.spy(parser.Fanet, '_parse_protocol_specific')
+        parser.Parser('FNT1103CE>OGNFNT,qAS,FNB1103CE:/183734h5057.94N/'
+                      '00801.00Eg354/001/A=001042 !W30! id1E1103CE -10fpm')
+        parser.Fanet._parse_protocol_specific.assert_called_once_with(
+            '!W30! id1E1103CE -10fpm')
+
+
 class TestServerParser:
 
     def test_parse_message_beacon(self, mocker):
