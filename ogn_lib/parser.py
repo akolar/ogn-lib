@@ -814,7 +814,6 @@ class Fanet(Parser):
             }
         ]
 
-        print(fields)
         return {
             '_update': update_position,
             'id': fields[1],
