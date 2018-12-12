@@ -179,7 +179,10 @@ class OgnClient:
 
         line = None
         while line != '' and not self._kill:
-            line = self._sock_file.readline().strip()
+            try:
+                line = self._sock_file.readline().strip()
+            except UnicodeDecodeError:
+                continue
             logger.debug('Received APRS message: %s', line)
 
             if line.startswith('#'):
